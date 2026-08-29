@@ -52,7 +52,7 @@ pre.ar{direction:rtl;text-align:right}
 <body>
 <header>
   <h1>أمين المستودع — الأدوية والريكوست</h1>
-  <p>V11 — استلام العبوة → مطابقة Oracle الآمنة → تنبيه الصلاحية → ريكوست</p>
+  <p>V12 — استلام العبوة → مطابقة Oracle الآمنة → تنبيه الصلاحية → ريكوست + بريد عام</p>
 </header>
 
 <main>
@@ -202,6 +202,32 @@ pre.ar{direction:rtl;text-align:right}
       <div id="requestMessage"></div>
     </div>
 
+    <div class="card">
+      <h2>بريد عام</h2>
+      <div class="notice">بريد حر غير مرتبط بريكوست أو موضوع محدد. في النسخة الحالية لا توجد خدمة ترجمة خارجية؛ لذلك تُدخل/تلصق النص العربي والترجمة الإنجليزية والترجمة العكسية العربية يدويًا، ثم تعتمدها قبل الإرسال.</div>
+
+      <label>المخاطبة</label>
+      <select id="generalRecipientMode"><option value="individual">فرد</option><option value="team">مجموعة / فريق</option></select>
+
+      <label>المستلم</label>
+      <select id="generalRecipientSelect"></select>
+
+      <label>عنوان البريد (حر)</label>
+      <input id="generalSubject" placeholder="مثال: Reduction of M1 Max Items">
+
+      <label>النص العربي الأصلي</label>
+      <textarea id="generalArBody" rows="7" placeholder="اكتب نص البريد بالعربية"></textarea>
+
+      <label>الترجمة الإنجليزية</label>
+      <textarea id="generalEnBody" rows="7" placeholder="اكتب أو الصق الترجمة الإنجليزية"></textarea>
+
+      <label>الترجمة العكسية العربية</label>
+      <textarea id="generalBackAr" rows="7" placeholder="اكتب أو الصق الترجمة العكسية للنص الإنجليزي"></textarea>
+
+      <button id="generateGeneralMailBtn" class="primary">إنشاء البريد العام للمراجعة</button>
+      <div id="generalMailMessage"></div>
+    </div>
+
     <div id="reviewCard" class="card hidden">
       <h2>مراجعة واعتماد البريد</h2>
       <div class="meta">الترجمة هنا مقيدة بصيغة الريكوست المعتمدة: يحوّل التطبيق النص العربي نفسه إلى الإنجليزية، ثم يعيد ترجمة النص الإنجليزي نفسه إلى العربية، ويمنع الإرسال إذا لم ينجح التطابق الدائري.</div>
@@ -239,6 +265,17 @@ pre.ar{direction:rtl;text-align:right}
       <button id="saveMailBtn" class="primary">حفظ في قائمة البريد</button>
       <div id="mailList" style="margin-top:12px"></div>
     </div>
+
+    <div class="card">
+      <h2>بريد محفوظ / مرجعي</h2>
+      <div class="meta">يتضمن البريد الظاهر في الصور المرفقة. الأكواد المنقولة من الصورة محفوظة كمرجع غير موثّق ويجب مراجعتها قبل إعادة الاستخدام.</div>
+      <div id="savedMailTemplates" style="margin-top:12px"></div>
+    </div>
+
+    <div class="card">
+      <h2>سجل البريد العام المرسل</h2>
+      <div id="generalMailHistory"></div>
+    </div>
   </section>
 
   <section id="medsView" class="hidden">
@@ -264,7 +301,9 @@ const KEYS={
   receipts:'mw_receipts_v7',
   requests:'mw_requests_v7',
   mail:'mw_mail_v7',
-  pendingEmails:'mw_pending_emails_v8'
+  pendingEmails:'mw_pending_emails_v8',
+  generalHistory:'mw_general_mail_history_v12',
+  savedTemplates:'mw_saved_mail_templates_v12'
 };
 function load(k,f){try{return JSON.parse(localStorage.getItem(k))??f}catch{return f}}
 function save(k,v){localStorage.setItem(k,JSON.stringify(v))}
@@ -284,6 +323,37 @@ save(KEYS.catalog,catalog);save(KEYS.receipts,receipts);save(KEYS.requests,reque
 
 let draft=null;
 let requestOriginReceiptId=null;
+let generalHistory=load(KEYS.generalHistory,[]);
+let savedTemplates=load(KEYS.savedTemplates,[]);
+if(!Array.isArray(generalHistory))generalHistory=[];
+if(!Array.isArray(savedTemplates))savedTemplates=[];
+if(!savedTemplates.length){
+  savedTemplates=[{
+    id:'photo_m1_reduction_2026',
+    subject:'Reduction of M1 Max Items',
+    source:'USER_PHOTO_TRANSCRIPTION',
+    needsVerification:true,
+    bodyEn:[
+      'Good morning everyone,',
+      '',
+      'I would like to reduce the quantities of the following M1 Max items:',
+      '',
+      '• PosiFlush — Code: DDSP4626 — Quantity: 600',
+      '• Enteral Syringe ENFit — Code: DDSE4241 — Quantity: 100',
+      '• Syringe 50 mL — Code: DDS86718 — Quantity: 50',
+      '• Feeding Pump — Code: DDSC4912 — Quantity: 100',
+      '',
+      'Please assist with reducing these quantities accordingly.',
+      '',
+      'Thank you for your support.',
+      '',
+      'Best regards,',
+      'Warehouse Keeper',
+      'Zahra Essa'
+    ].join('\n')
+  }];
+  save(KEYS.savedTemplates,savedTemplates);
+}
 let pendingEmails=load(KEYS.pendingEmails,[]);
 if(!Array.isArray(pendingEmails))pendingEmails=[];
 const oldPendingV7=load('mw_pending_email_v7',null);
@@ -820,6 +890,31 @@ $('readOracleBtn').onclick=async()=>{
   }catch(e){$('oracleStatus').textContent=e.message}
 };
 
+
+window.useSavedTemplate=id=>{
+  const t=savedTemplates.find(x=>x.id===id);if(!t)return;
+  $('generalSubject').value=t.subject;
+  let lines=String(t.bodyEn||'').split('\n');
+
+  // Strip greeting and standard signature when loading into the editable body.
+  if(lines[0]?.toLowerCase().startsWith('good '))lines=lines.slice(1);
+  while(lines.length&&lines[0]==='')lines.shift();
+
+  const sigStart=lines.findIndex((line,i)=>
+    line==='Thank you for your support.' &&
+    lines.slice(i,i+4).join('\n')===MAIL_SIGNATURE_EN
+  );
+  if(sigStart>=0)lines=lines.slice(0,sigStart);
+  while(lines.length&&lines[lines.length-1]==='')lines.pop();
+
+  $('generalEnBody').value=lines.join('\n');
+  $('generalArBody').value='';
+  $('generalBackAr').value='';
+  show('requests');
+  $('generalMailMessage').innerHTML='<div class="notice">تم تحميل البريد الإنجليزي المحفوظ. راجع الأكواد ثم أدخل النص العربي والترجمة العكسية قبل الإرسال.</div>';
+  $('generalSubject').scrollIntoView({behavior:'smooth'});
+};
+
 /* -------- Alerts / Home -------- */
 function openRequests(){return requests.filter(r=>!r.closedAt)}
 function activeExpiryAlerts(){return receipts.map(r=>({r,s:alertState(r)})).filter(x=>x.s)}
@@ -867,7 +962,7 @@ window.openPendingEmailReview=()=>{
 $('startupClose').onclick=()=>$('startupAlert').classList.add('hidden');
 
 /* -------- Request -------- */
-function typeLabel(t){return t==='expiry'?'قرب انتهاء الصلاحية':t==='urgent'?'طلب دواء طارئ / غير مغطى':'إرجاع دواء منتهي الصلاحية'}
+function typeLabel(t){return t==='general'?'بريد عام':t==='expiry'?'قرب انتهاء الصلاحية':t==='urgent'?'طلب دواء طارئ / غير مغطى':'إرجاع دواء منتهي الصلاحية'}
 $('requestType').onchange=()=>{
   const t=$('requestType').value;
   $('manualApprovalBox').classList.toggle('hidden',t==='expiry');
@@ -875,12 +970,29 @@ $('requestType').onchange=()=>{
   $('sectionHeadApproved').checked=false;
   if(t!=='expiry')requestOriginReceiptId=null;
 };
-function refreshRecipients(){
-  const kind=$('recipientMode').value;
+function recipientOptions(kind){
   const list=mail.filter(x=>x.kind===kind);
-  $('recipientSelect').innerHTML=list.length?list.map(x=>`<option value="${x.id}">${esc(x.name)} — ${esc(x.role)} — ${esc(x.entity)} — ${esc(x.email)}</option>`).join(''):'<option value="">لا يوجد بريد محفوظ لهذا النوع</option>';
+  return list.length?list.map(x=>`<option value="${x.id}">${esc(x.name)} — ${esc(x.role)} — ${esc(x.entity)} — ${esc(x.email)}</option>`).join(''):'<option value="">لا يوجد بريد محفوظ لهذا النوع</option>';
+}
+function refreshRecipients(){
+  $('recipientSelect').innerHTML=recipientOptions($('recipientMode').value);
+  $('generalRecipientSelect').innerHTML=recipientOptions($('generalRecipientMode').value);
 }
 $('recipientMode').onchange=refreshRecipients;
+$('generalRecipientMode').onchange=refreshRecipients;
+
+const MAIL_SIGNATURE_AR=[
+  'شكرًا لدعمكم.',
+  'مع أطيب التحيات،',
+  'أمين المستودع',
+  'زهرة عيسى'
+].join('\n');
+const MAIL_SIGNATURE_EN=[
+  'Thank you for your support.',
+  'Best regards,',
+  'Warehouse Keeper',
+  'Zahra Essa'
+].join('\n');
 
 const REQUEST_EMAIL_TEMPLATE_VERSION='REQUEST_EMAIL_V1';
 const CONTROLLED_TRANSLATION_RULESET_VERSION='CONTROLLED_AR_EN_AR_V1';
@@ -908,6 +1020,10 @@ function translateControlledArabicLineToEnglish(line){
   if(m)return {ok:true,line:`Good afternoon ${m[1]},`};
 
   if(CONTROLLED_AR_TO_EN[line])return {ok:true,line:CONTROLLED_AR_TO_EN[line]};
+  if(line==='شكرًا لدعمكم.')return {ok:true,line:'Thank you for your support.'};
+  if(line==='مع أطيب التحيات،')return {ok:true,line:'Best regards,'};
+  if(line==='أمين المستودع')return {ok:true,line:'Warehouse Keeper'};
+  if(line==='زهرة عيسى')return {ok:true,line:'Zahra Essa'};
 
   const prefixes=[
     ['اسم الدواء: ','Drug Name: '],
@@ -933,6 +1049,10 @@ function translateControlledEnglishLineToArabic(line){
   if(m)return {ok:true,line:`مساء الخير ${m[1]}،`};
 
   if(CONTROLLED_EN_TO_AR[line])return {ok:true,line:CONTROLLED_EN_TO_AR[line]};
+  if(line==='Thank you for your support.')return {ok:true,line:'شكرًا لدعمكم.'};
+  if(line==='Best regards,')return {ok:true,line:'مع أطيب التحيات،'};
+  if(line==='Warehouse Keeper')return {ok:true,line:'أمين المستودع'};
+  if(line==='Zahra Essa')return {ok:true,line:'زهرة عيسى'};
 
   const prefixes=[
     ['Drug Name: ','اسم الدواء: '],
@@ -979,6 +1099,58 @@ function bodyAr(t,drug,code,prod,exp){
   return l.join('\n');
 }
 
+
+$('generateGeneralMailBtn').onclick=()=>{
+  const rec=mail.find(x=>x.id===$('generalRecipientSelect').value);
+  const subject=$('generalSubject').value.trim();
+  const arBody=$('generalArBody').value.trim();
+  const enBody=$('generalEnBody').value.trim();
+  const backBody=$('generalBackAr').value.trim();
+
+  if(!rec||!subject||!arBody||!enBody||!backBody){
+    $('generalMailMessage').innerHTML='<div class="error">أكمل المستلم والعنوان والنص العربي والترجمة الإنجليزية والترجمة العكسية.</div>';
+    return;
+  }
+
+  const team=$('generalRecipientMode').value==='team';
+  const salAr=team?`${greetAr()} أيها الفريق،`:`${greetAr()} ${rec.name}،`;
+  const salEn=team?`${greetEn()} Team,`:`${greetEn()} ${rec.name},`;
+
+  const ar=[salAr,'',arBody,'',MAIL_SIGNATURE_AR].join('\\n');
+  const en=[salEn,'',enBody,'',MAIL_SIGNATURE_EN].join('\\n');
+  const back=[salAr,'',backBody,'',MAIL_SIGNATURE_AR].join('\\n');
+
+  draft={
+    id:uid(),
+    type:'general',
+    drug:'',
+    code:'',
+    prod:'',
+    exp:'',
+    recipient:rec,
+    subject,
+    ar,en,back,
+    emailTemplateVersion:'GENERAL_EMAIL_V1',
+    translationMode:'MANUAL_GENERAL_AR_EN_AR',
+    translationRulesetVersion:null,
+    translationRoundTripVerified:false,
+    initiationSource:'GENERAL_EMAIL',
+    sourceReceiptId:null,
+    sectionHeadApprovalRecorded:false,
+    sectionHeadApprovalRecordedAt:null,
+    sectionHeadApprovalEvidence:null
+  };
+
+  $('subjectEn').textContent=draft.subject;
+  $('requestAr').textContent=ar;
+  $('requestEn').textContent=en;
+  $('backAr').textContent=back;
+  $('approveMeaning').checked=false;
+  $('openMailBtn').disabled=true;
+  $('reviewCard').classList.remove('hidden');
+  $('reviewCard').scrollIntoView({behavior:'smooth'});
+};
+
 $('generateRequestBtn').onclick=()=>{
   const t=$('requestType').value,drug=$('reqDrugName').value.trim(),code=$('reqDrugCode').value.trim();
   const prod=$('reqProdDate').value,exp=$('reqExpiryDate').value,rec=mail.find(x=>x.id===$('recipientSelect').value);
@@ -1004,7 +1176,7 @@ $('generateRequestBtn').onclick=()=>{
   const approvalRecordedAt=isManual?new Date().toISOString():null;
 
   const salAr=$('recipientMode').value==='team'?`${greetAr()} أيها الفريق،`:`${greetAr()} ${rec.name}،`;
-  const sourceAr=[salAr,'',bodyAr(t,drug,code,prod,exp)].join('\n');
+  const sourceAr=[salAr,'',bodyAr(t,drug,code,prod,exp),'',MAIL_SIGNATURE_AR].join('\n');
 
   // Actual controlled transformation: exact Arabic source -> English -> Arabic back-translation.
   const forward=translateControlledArabicToEnglish(sourceAr);
@@ -1105,8 +1277,19 @@ window.confirmPendingEmail=id=>{
   const p=pendingEmails.find(x=>x.id===id);
   if(!p)return;
 
-  if(!requests.some(x=>x.id===p.id)){
-    const confirmedAt=new Date().toISOString();
+  const confirmedAt=new Date().toISOString();
+  if(p.type==='general'){
+    if(!generalHistory.some(x=>x.id===p.id)){
+      generalHistory.unshift({
+        ...p,
+        status:'SENT_CONFIRMED',
+        userConfirmedSentAt:confirmedAt,
+        sentAt:confirmedAt,
+        sentEvidence:'WAREHOUSE_KEEPER_EXPLICIT_CONFIRMATION'
+      });
+      save(KEYS.generalHistory,generalHistory);
+    }
+  }else if(!requests.some(x=>x.id===p.id)){
     requests.unshift({
       ...p,
       status:'OPEN_WAITING_ACTION',
@@ -1125,7 +1308,7 @@ window.confirmPendingEmail=id=>{
   pendingEmails=pendingEmails.filter(x=>x.id!==id);
   persistPendingEmails();
   renderPendingEmailConfirmation();
-  renderRequests();renderHome();showStartupAlerts();
+  renderRequests();renderMail();renderHome();showStartupAlerts();
 };
 window.cancelPendingEmail=id=>{
   pendingEmails=pendingEmails.filter(x=>x.id!==id);
@@ -1195,7 +1378,7 @@ $('exportBackupBtn').onclick=()=>{
   const payload={
     exportedAt:new Date().toISOString(),
     warning:'LOCAL_BACKUP_NOT_INSTITUTIONAL_AUDIT_PROOF',
-    catalog,receipts,requests,mail,pendingEmails
+    catalog,receipts,requests,mail,pendingEmails,generalHistory,savedTemplates
   };
   const blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'});
   const url=URL.createObjectURL(blob);
@@ -1235,6 +1418,22 @@ $('saveMailBtn').onclick=()=>{
 };
 function renderMail(){
   $('mailList').innerHTML=mail.length?mail.map(x=>`<div class="card"><strong>${esc(x.name)}</strong><br><span class="meta">${esc(x.email)}<br>${esc(x.entity)} — ${esc(x.role)} — ${x.kind==='team'?'مجموعة':'فرد'}</span><button class="danger" onclick="delMail('${x.id}')">حذف</button></div>`).join(''):'<div class="ok">قائمة البريد فارغة.</div>';
+  $('savedMailTemplates').innerHTML=savedTemplates.length?savedTemplates.map(t=>`
+    <div class="card case">
+      <strong>${esc(t.subject)}</strong>
+      <div class="meta">${t.needsVerification?'منقول من صورة — راجع الأكواد قبل الاستخدام':'محفوظ'}</div>
+      <pre class="email">${esc(t.bodyEn)}</pre>
+      <button class="secondary" onclick="useSavedTemplate('${t.id}')">استخدام في البريد العام</button>
+    </div>
+  `).join(''):'<div class="meta">لا توجد نماذج محفوظة.</div>';
+
+  $('generalMailHistory').innerHTML=generalHistory.length?generalHistory.map(x=>`
+    <div class="card case">
+      <strong>${esc(x.subject)}</strong><br>
+      <span class="meta">إلى: ${esc(x.recipient?.name||'')} — ${x.sentAt?new Date(x.sentAt).toLocaleString('ar-SA'):''}</span>
+      <pre class="email">${esc(x.en||'')}</pre>
+    </div>
+  `).join(''):'<div class="meta">لا يوجد بريد عام مؤكد الإرسال حتى الآن.</div>';
 }
 window.delMail=id=>{mail=mail.filter(x=>x.id!==id);save(KEYS.mail,mail);renderMail();refreshRecipients()};
 
