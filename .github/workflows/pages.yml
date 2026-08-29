@@ -24,11 +24,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
 
-      - name: Build V14 site
+      - name: Build V15 site
         run: |
           mkdir -p dist
-          cp index.html dist/index.html
-          patch dist/index.html < .github/v14.patch
+          base64 -d site-v15.html.gz.b64 | gunzip > dist/index.html
+          grep -q 'V15' dist/index.html
 
       - name: Configure Pages
         uses: actions/configure-pages@v5
