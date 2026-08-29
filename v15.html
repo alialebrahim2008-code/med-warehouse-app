@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>أمين المستودع — V15</title>
+<style>body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Tahoma,Arial,sans-serif;margin:0;background:#f5f7f8;color:#182126}.load{max-width:600px;margin:80px auto;padding:24px;text-align:center}.err{color:#b42318}</style>
+</head>
+<body>
+<div id="loader" class="load">جاري فتح V15 وتركيب الترجمة الآلية…</div>
+<script>
+(async()=>{
+  const r=await fetch('./index.html?base=v14&t='+Date.now(),{cache:'no-store'});
+  if(!r.ok)throw new Error('BASE_HTTP_'+r.status);
+  let h=await r.text();
+  h=h.replace(/V14\s*—/g,'V15 —');
+  const patch=`<script>
+(function(){
+  const d=document;
+  const $=id=>d.getElementById(id);
+  const PROVIDER='MyMemory';
+  const VERSION='V15_AUTO_AR_EN_AR';
+
+  function bytes(s){return new TextEncoder().encode(String(s||'')).length}
+  function decode(s){const t=d.createElement('textarea');t.innerHTML=String(s||'');return t.value}
+  function chunks(text,max=420){
+    const s=String(text||'');
+    if(bytes(s)<=max)return [s];
+    const out=[];let cur='';
+    for(const w of s.split(/\\s+/)){
+      const c=cur?cur+' '+w:w;
+      if(cur&&bytes(c)>max){out.push(cur);cur=w}else cur=c;
+    }
+    if(cur)out.push(cur);
+    return out;
+  }
+  async function seg(q,src,tgt){
+    q=String(q||'').trim();if(!q)return '';
+    const u='https://api.mymemory.translated.net/get?q='+encodeURIComponent(q)+'&langpair='+encodeURIComponent(src+'|'+tgt)+'&mt=1';
+    const res=await fetch(u,{headers:{Accept:'application/json'}});
+    if(!res.ok)throw new Error('TRANSLATION_HTTP_'+res.status);
+    const j=await res.json();
+    const out=decode(j?.responseData?.translatedText||'').trim();
+    if(!out||/MYMEMORY WARNING/i.test(out))throw new Error('TRANSLATION_EMPTY_OR_LIMIT');
+    return out;
+  }
+  async function text(txt,src,tgt,status){
+    const lines=String(txt||'').split(/\\r?\\n/), out=[];
+    for(let i=0;i<lines.length;i++){
+      if(!lines[i].trim()){out.push('');continue}
+      const pp=chunks(lines[i]), tt=[];
+      for(const p of pp)tt.push(await seg(p,src,tgt));
+      out.push(tt.join(' '));
+      if(status)status.textContent='جاري الترجمة… '+Math.round((i+1)/lines.length*100)+'%';
+    }
+    return out.join('\\n');
+  }
+  async function round(subjectAr,bodyAr,status){
+    status.textContent='ترجمة العربي إلى الإنجليزي…';
+    const subjectEn=await text(subjectAr,'ar','en',status);
+    const bodyEn=await text(bodyAr,'ar','en',status);
+    status.textContent='إعادة ترجمة الإنجليزي إلى العربية…';
+    const subjectBack=await text(subjectEn,'en','ar',status);
+    const bodyBack=await text(bodyEn,'en','ar',status);
+    status.textContent='تمت الترجمة. راجع النتائج قبل الاعتماد.';
+    return {subjectEn,bodyEn,subjectBack,bodyBack};
+  }
+  function el(tag,attrs={},txt=''){
+    const x=d.createElement(tag);Object.entries(attrs).forEach(([k,v])=>x.setAttribute(k,v));if(txt)x.textContent=txt;return x;
+  }
+  function addGeneral(){
+    const subj=$('generalSubject'), ar=$('generalArBody'), en=$('generalEnBody'), back=$('generalBackAr'), gen=$('generateGeneralMailBtn');
+    if(!subj||!ar||!en||!back||!gen||$('v15GeneralSubjectAr'))return;
+    const oldLabel=subj.previousElementSibling;if(oldLabel&&oldLabel.tagName==='LABEL')oldLabel.textContent='موضوع الرسالة بالإنجليزية';
+    const la=el('label',{},'موضوع الرسالة بالعربية');
+    const sa=el('input',{id:'v15GeneralSubjectAr',placeholder:'اكتب موضوع الرسالة بالعربية'});
+    subj.parentNode.insertBefore(la,oldLabel||subj);subj.parentNode.insertBefore(sa,oldLabel||subj);
+    subj.placeholder='يُترجم تلقائيًا ويمكن تعديله';
+    const lb=el('label',{},'موضوع الرسالة بعد الترجمة العكسية');
+    const sb=el('input',{id:'v15GeneralSubjectBack',readonly:'readonly',placeholder:'يظهر تلقائيًا للمراجعة'});
+    subj.insertAdjacentElement('afterend',lb);lb.insertAdjacentElement('afterend',sb);
+    const btn=el('button',{id:'v15TranslateGeneral',class:'secondary',type:'button'},'ترجم تلقائيًا: عربي → إنجليزي → عربي');
+    const st=el('div',{id:'v15GeneralStatus',class:'progress'});
+    gen.parentNode.insertBefore(btn,gen);gen.parentNode.insertBefore(st,gen);
+    const warn=el('div',{class:'notice'},'تنبيه: الترجمة الآلية تستخدم خدمة خارجية عبر الإنترنت؛ لا تُدخل بيانات مرضى أو معلومات سرية.');
+    btn.parentNode.insertBefore(warn,btn);
+    async function doTranslate(){
+      if(!sa.value.trim()||!ar.value.trim()){st.textContent='اكتب موضوع الرسالة والنص العربي أولًا.';return false}
+      btn.disabled=true;gen.disabled=true;
+      try{const z=await round(sa.value.trim(),ar.value.trim(),st);subj.value=z.subjectEn;en.value=z.bodyEn;sb.value=z.subjectBack;back.value=z.bodyBack;return true}
+      catch(e){console.error(e);st.textContent='تعذرت الترجمة الآن. تحقق من الإنترنت ثم أعد المحاولة.';return false}
+      finally{btn.disabled=false;gen.disabled=false}
+    }
+    btn.onclick=doTranslate;
+    const original=gen.onclick;
+    gen.onclick=async function(e){
+      if(sa.value.trim()&&ar.value.trim()&&(!subj.value.trim()||!en.value.trim()||!back.value.trim())){
+        const ok=await doTranslate();if(!ok)return;
+      }
+      return original&&original.call(this,e);
+    };
+  }
+  function addReports(){
+    const ta=$('reportTitleAr'), te=$('reportTitleEn'), ar=$('reportAr'), en=$('reportEn'), back=$('reportBackAr'), save=$('saveReportBtn');
+    if(!ta||!te||!ar||!en||!back||!save||$('v15ReportTitleBack'))return;
+    te.placeholder='يُترجم تلقائيًا ويمكن تعديله';
+    const lb=el('label',{},'عنوان التقرير بعد الترجمة العكسية');
+    const tb=el('input',{id:'v15ReportTitleBack',readonly:'readonly',placeholder:'يظهر تلقائيًا للمراجعة'});
+    te.insertAdjacentElement('afterend',lb);lb.insertAdjacentElement('afterend',tb);
+    const btn=el('button',{id:'v15TranslateReport',class:'secondary',type:'button'},'ترجم تلقائيًا: عربي → إنجليزي → عربي');
+    const st=el('div',{id:'v15ReportStatus',class:'progress'});
+    save.parentNode.insertBefore(btn,save);save.parentNode.insertBefore(st,save);
+    const warn=el('div',{class:'notice'},'تنبيه: الترجمة الآلية تستخدم خدمة خارجية عبر الإنترنت؛ لا تُدخل بيانات مرضى أو معلومات سرية.');
+    btn.parentNode.insertBefore(warn,btn);
+    async function doTranslate(){
+      if(!ta.value.trim()||!ar.value.trim()){st.textContent='اكتب عنوان التقرير ونص التقرير بالعربية أولًا.';return false}
+      btn.disabled=true;save.disabled=true;
+      try{const z=await round(ta.value.trim(),ar.value.trim(),st);te.value=z.subjectEn;en.value=z.bodyEn;tb.value=z.subjectBack;back.value=z.bodyBack;return true}
+      catch(e){console.error(e);st.textContent='تعذرت الترجمة الآن. تحقق من الإنترنت ثم أعد المحاولة.';return false}
+      finally{btn.disabled=false;save.disabled=false}
+    }
+    btn.onclick=doTranslate;
+    const original=save.onclick;
+    save.onclick=async function(e){
+      if(ta.value.trim()&&ar.value.trim()&&(!te.value.trim()||!en.value.trim()||!back.value.trim())){
+        const ok=await doTranslate();if(!ok)return;
+      }
+      return original&&original.call(this,e);
+    };
+    const oldEdit=window.editReport;
+    if(oldEdit)window.editReport=function(id){const x=oldEdit(id);tb.value='';return x};
+  }
+  function boot(){
+    addGeneral();addReports();
+    const p=d.querySelector('header p');if(p)p.textContent=p.textContent.replace(/V14/g,'V15');
+  }
+  if(d.readyState==='loading')d.addEventListener('DOMContentLoaded',boot);else boot();
+  setTimeout(boot,600);
+})();
+<\/script>`;
+  h=h.replace('</body>',patch+'</body>');
+  document.open();document.write(h);document.close();
+})().catch(e=>{document.getElementById('loader').innerHTML='<div class="err">تعذر فتح V15. أعد المحاولة مع اتصال الإنترنت.</div>';console.error(e)});
+</script>
+</body>
+</html>
