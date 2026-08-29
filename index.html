@@ -1,0 +1,1258 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>أمين المستودع — الأدوية والريكوست</title>
+
+<!-- تعمل المكتبتان داخل المتصفح على الصورة المختارة؛ لا يرسل التطبيق الصورة إلى خادمنا. -->
+<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js"></script>
+
+<style>
+:root{--bg:#f5f7f8;--card:#fff;--text:#182126;--muted:#68757d;--line:#dfe5e8;--accent:#0f766e;--accent2:#e6f4f1;--warn:#9a5700;--danger:#b42318;--ok:#166534}
+*{box-sizing:border-box}
+body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Tahoma,Arial,sans-serif;background:var(--bg);color:var(--text)}
+header{position:sticky;top:0;z-index:10;background:rgba(245,247,248,.96);backdrop-filter:blur(12px);border-bottom:1px solid var(--line);padding:13px 14px}
+header h1{font-size:18px;margin:0 0 4px} header p{font-size:12px;color:var(--muted);margin:0}
+main{max-width:760px;margin:auto;padding:14px 14px 100px}
+.nav{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:13px}
+.nav button{min-height:46px;border:1px solid var(--line);background:#fff;border-radius:12px;font-size:12px;padding:8px}
+.nav button.active{background:var(--accent2);border-color:var(--accent);font-weight:800}
+.card{background:#fff;border:1px solid var(--line);border-radius:16px;padding:14px;margin-bottom:12px}
+.card h2{font-size:16px;margin:0 0 10px}.card h3{font-size:14px;margin:14px 0 8px}
+label{display:block;font-size:13px;font-weight:700;margin:10px 0 6px}
+input,select,textarea{width:100%;font-size:16px;border:1px solid #cfd7db;border-radius:11px;padding:11px;background:#fff;color:var(--text)}
+textarea{min-height:88px;resize:vertical}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+button.primary,button.secondary,button.danger{width:100%;min-height:44px;border-radius:12px;padding:10px 12px;font-size:14px;font-weight:800;margin-top:9px}
+button.primary{border:0;background:var(--accent);color:#fff}
+button.secondary{border:1px solid var(--accent);background:#fff;color:var(--accent)}
+button.danger{border:1px solid #efb3af;background:#fff;color:var(--danger)}
+button:disabled{opacity:.45}
+.notice,.ok,.error{padding:11px 12px;border-radius:12px;font-size:13px;margin:9px 0;line-height:1.6}
+.notice{background:#fff7ed;color:#854d0e}.ok{background:#ecfdf3;color:var(--ok)}.error{background:#fff1f0;color:var(--danger)}
+.meta{font-size:12px;color:var(--muted);line-height:1.8}
+.hidden{display:none!important}
+.pill{display:inline-block;padding:4px 8px;border-radius:999px;background:#eef2f4;font-size:11px;margin:2px}
+.case{border-inline-start:4px solid var(--accent);padding-inline-start:11px}
+.case.bad{border-inline-start-color:var(--danger)}
+pre.email{white-space:pre-wrap;word-break:break-word;background:#f8fafb;border:1px solid var(--line);padding:11px;border-radius:11px;font-family:inherit;font-size:13px;direction:ltr;text-align:left}
+pre.ar{direction:rtl;text-align:right}
+.capture{display:block;border:1px dashed #aebbc1;border-radius:12px;padding:12px;background:#fbfcfd}
+.capture input{border:0;padding:5px 0;background:transparent}
+.progress{font-size:12px;color:var(--muted);margin-top:7px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+#startupAlert{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:100;padding:18px;overflow:auto}
+#startupAlert>div{max-width:620px;margin:35px auto;background:#fff;border-radius:18px;padding:16px}
+@media(max-width:520px){.row,.grid2{grid-template-columns:1fr}.nav{grid-template-columns:1fr 1fr 1fr}}
+</style>
+</head>
+<body>
+<header>
+  <h1>أمين المستودع — الأدوية والريكوست</h1>
+  <p>V11 — استلام العبوة → مطابقة Oracle الآمنة → تنبيه الصلاحية → ريكوست</p>
+</header>
+
+<main>
+  <div class="nav">
+    <button id="tabHome" class="active">الرئيسية</button>
+    <button id="tabReceive">استلام دواء</button>
+    <button id="tabOracle">مطابقة Oracle</button>
+    <button id="tabRequests">الريكوست</button>
+    <button id="tabMail">قائمة البريد</button>
+    <button id="tabMeds">المتابعة</button>
+  </div>
+
+  <section id="homeView">
+    <div class="card">
+      <h2>الحالات التي تحتاج انتباهك</h2>
+      <div id="homeSummary"></div>
+      <button id="exportBackupBtn" class="secondary">تصدير نسخة احتياطية محلية</button>
+      <div class="meta">النسخة الاحتياطية تساعد على الاستمرارية فقط، ولا تحول التخزين المحلي إلى سجل تدقيق مؤسسي.</div>
+    </div>
+  </section>
+
+  <section id="receiveView" class="hidden">
+    <div class="card">
+      <h2>1 — استلام دواء</h2>
+      <div class="notice">المسار الأساسي: صوّر الباركود، ثم صوّر تاريخ الإنتاج والانتهاء المطبوعين على العبوة.</div>
+
+      <details class="card" style="background:#fbfcfd">
+        <summary style="font-weight:800;cursor:pointer">استيراد دليل الأصناف مرة واحدة — اختياري</summary>
+        <div class="meta" style="margin-top:9px">
+          إذا توفر لدى الأمين ملف دليل أصناف معتمد، يمكن استيراده مرة واحدة لتعبئة اسم الدواء والكود وسياسة التنبيه تلقائيًا عند مسح الباركود.
+          الصيغة المدعومة حاليًا CSV بعناوين إلزامية:
+          <code>barcode,name,code,alertDays</code>.
+        </div>
+        <label>ملف دليل الأصناف CSV</label>
+        <input id="catalogFile" type="file" accept=".csv,text/csv">
+        <button id="importCatalogBtn" class="secondary">استيراد دليل الأصناف</button>
+        <div id="catalogImportStatus" class="progress"></div>
+      </details>
+
+      <label>صورة الباركود</label>
+      <div class="capture">
+        <input id="barcodeImage" type="file" accept="image/*" capture="environment">
+      </div>
+      <button id="scanBarcodeBtn" class="primary">قراءة الباركود</button>
+      <div id="barcodeStatus" class="progress"></div>
+
+      <label>قيمة الباركود المقروءة</label>
+      <input id="rawBarcode" placeholder="يُملأ آليًا بعد المسح">
+
+      <label>اسم الدواء</label>
+      <input id="recvDrugName" placeholder="يُملأ من دليل الصنف المحفوظ إن كان معروفًا">
+
+      <label>الكود المعتمد</label>
+      <input id="recvDrugCode" placeholder="الكود المعتمد للصنف">
+
+      <div class="notice">
+        عند أول ظهور لباركود غير معروف فقط، راجع اسم الدواء والكود المعتمد واحفظهما؛ بعد ذلك يتعرف التطبيق عليهما تلقائيًا عند تكرار نفس الباركود.
+      </div>
+
+      <label>صورة تاريخ الإنتاج والانتهاء على العبوة</label>
+      <div class="capture">
+        <input id="dateImage" type="file" accept="image/*" capture="environment">
+      </div>
+      <button id="readDatesBtn" class="primary">قراءة التاريخين من العبوة</button>
+      <div id="dateOcrStatus" class="progress"></div>
+
+      <div class="row">
+        <div>
+          <label>تاريخ الإنتاج — المرجع من العبوة</label>
+          <input id="recvProdDate" type="date">
+        </div>
+        <div>
+          <label>تاريخ الانتهاء — المرجع من العبوة</label>
+          <input id="recvExpiryDate" type="date">
+        </div>
+      </div>
+
+      <label>مواعيد التنبيه الخاصة بهذا الدواء</label>
+      <input id="recvAlertDays" placeholder="مثال توضيحي فقط: 45,20,10,2">
+      <div class="meta">لا توجد مدد ثابتة عامة. تحفظ السياسة مع الصنف وتستعاد تلقائيًا عند تكراره.</div>
+
+      <button id="saveReceiptBtn" class="primary">مراجعة واعتماد سجل الاستلام</button>
+      <div id="receiveMessage"></div>
+    </div>
+  </section>
+
+  <section id="oracleView" class="hidden">
+    <div class="card">
+      <h2>2 — مطابقة تقرير Oracle</h2>
+      <div class="notice">
+        صوّر صفحة أو أكثر من تقرير الإدخال المطبوع من Oracle. التطبيق يبحث عن الكود ليحدد الصنف، ثم يقارن فقط:
+        <strong>تاريخ الإنتاج</strong> و<strong>تاريخ الانتهاء</strong> في التقرير مع التاريخين الممسوحين من العبوة.
+      </div>
+
+      <label>صورة تقرير Oracle</label>
+      <div class="capture">
+        <input id="oracleImage" type="file" accept="image/*" capture="environment" multiple>
+      </div>
+      <button id="readOracleBtn" class="primary">قراءة التقرير وإجراء المطابقة</button>
+      <div id="oracleStatus" class="progress"></div>
+      <div id="oracleResults" style="margin-top:12px"></div>
+    </div>
+  </section>
+
+  <section id="requestsView" class="hidden">
+    <div class="card">
+      <h2>الريكوستات المفتوحة</h2>
+      <div id="requestsList"></div>
+    </div>
+
+    <div class="card">
+      <h2>إنشاء ريكوست</h2>
+
+      <label>نوع الريكوست</label>
+      <select id="requestType">
+        <option value="expiry">قرب انتهاء الصلاحية — من تنبيه النظام</option>
+        <option value="urgent">طلب دواء طارئ / غير مغطى بالطلب الآلي</option>
+        <option value="return">إرجاع دواء منتهي الصلاحية</option>
+      </select>
+
+      <div id="manualApprovalBox" class="hidden">
+        <label>مصدر تكليف رئيس القسم</label>
+        <select id="requestSource">
+          <option value="email">البريد الإلكتروني</option>
+          <option value="verbal">شفهي</option>
+        </select>
+        <label><input id="sectionHeadApproved" type="checkbox" style="width:auto;margin-left:6px"> تم استلام موافقة رئيس القسم</label>
+      </div>
+
+      <label>اسم الدواء</label>
+      <input id="reqDrugName">
+      <label>الكود المعتمد</label>
+      <input id="reqDrugCode">
+
+      <div id="reqDates" class="row">
+        <div><label>تاريخ الإنتاج</label><input id="reqProdDate" type="date"></div>
+        <div><label>تاريخ الانتهاء</label><input id="reqExpiryDate" type="date"></div>
+      </div>
+
+      <label>المخاطبة</label>
+      <select id="recipientMode"><option value="individual">فرد</option><option value="team">مجموعة / فريق</option></select>
+
+      <label>المستلم</label>
+      <select id="recipientSelect"></select>
+
+      <button id="generateRequestBtn" class="primary">إنشاء صيغة البريد</button>
+      <div id="requestMessage"></div>
+    </div>
+
+    <div id="reviewCard" class="card hidden">
+      <h2>مراجعة واعتماد البريد</h2>
+      <div class="meta">الترجمة هنا مقيدة بصيغة الريكوست المعتمدة: يحوّل التطبيق النص العربي نفسه إلى الإنجليزية، ثم يعيد ترجمة النص الإنجليزي نفسه إلى العربية، ويمنع الإرسال إذا لم ينجح التطابق الدائري.</div>
+      <label>العنوان</label><pre id="subjectEn" class="email"></pre>
+      <label>النص العربي الأصلي</label><pre id="requestAr" class="email ar"></pre>
+      <label>البريد الإنجليزي</label><pre id="requestEn" class="email"></pre>
+      <label>الترجمة العكسية من النص الإنجليزي إلى العربية</label><pre id="backAr" class="email ar"></pre>
+      <label><input id="approveMeaning" type="checkbox" style="width:auto;margin-left:6px"> راجعت الترجمة العكسية العربية للنص الإنجليزي وأوافق عليها</label>
+      <button id="openMailBtn" class="primary" disabled>اعتماد وفتح البريد</button>
+      <button id="copyMailBtn" class="secondary">نسخ البريد الإنجليزي</button>
+      <button id="shareMailBtn" class="secondary">مشاركة النص</button>
+    </div>
+
+    <div id="emailConfirmationCard" class="card hidden">
+      <h2>رسائل تنتظر تأكيد الإرسال</h2>
+      <div class="notice">
+        فتح البريد أو نسخ النص لا يعني أن الرسالة أُرسلت. لكل رسالة، أكد الإرسال الفعلي أو ألغِ التجهيز.
+      </div>
+      <div id="emailConfirmationSummary"></div>
+    </div>
+  </section>
+
+  <section id="mailView" class="hidden">
+    <div class="card">
+      <h2>قائمة البريد</h2>
+      <label>البريد الرسمي</label><input id="mailEmail" type="email">
+      <label>اسم المسؤول</label><input id="mailName">
+      <label>الجهة</label><input id="mailEntity">
+      <label>الصفة</label>
+      <select id="mailRole">
+        <option>دكتور</option><option>موظف</option><option>أمين مستودع</option><option>مدير</option><option>رئيس قسم</option>
+      </select>
+      <label>نوع البريد</label>
+      <select id="mailKind"><option value="individual">فرد</option><option value="team">مجموعة / فريق</option></select>
+      <button id="saveMailBtn" class="primary">حفظ في قائمة البريد</button>
+      <div id="mailList" style="margin-top:12px"></div>
+    </div>
+  </section>
+
+  <section id="medsView" class="hidden">
+    <div class="card">
+      <h2>الأدوية تحت متابعة الصلاحية</h2>
+      <div id="medsList"></div>
+    </div>
+  </section>
+
+  <div id="startupAlert" class="hidden">
+    <div>
+      <h2 style="margin-top:0">تنبيهات تحتاج متابعة</h2>
+      <div id="startupBody"></div>
+      <button id="startupClose" class="primary">تم الاطلاع</button>
+    </div>
+  </div>
+</main>
+
+<script>
+const $=id=>document.getElementById(id);
+const KEYS={
+  catalog:'mw_catalog_v7',
+  receipts:'mw_receipts_v7',
+  requests:'mw_requests_v7',
+  mail:'mw_mail_v7',
+  pendingEmails:'mw_pending_emails_v8'
+};
+function load(k,f){try{return JSON.parse(localStorage.getItem(k))??f}catch{return f}}
+function save(k,v){localStorage.setItem(k,JSON.stringify(v))}
+function esc(s){return String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]))}
+function uid(){return (crypto.randomUUID?crypto.randomUUID():Date.now()+'_'+Math.random())}
+let catalog=load(KEYS.catalog,[]);
+let receipts=load(KEYS.receipts,[]);
+let requests=load(KEYS.requests,[]);
+let mail=load(KEYS.mail,[]);
+
+// One-time local migration from V6 when V7 is empty.
+if(!catalog.length) catalog=load('mw_catalog_v6',[]);
+if(!receipts.length) receipts=load('mw_receipts_v6',[]);
+if(!requests.length) requests=load('mw_requests_v6',[]);
+if(!mail.length) mail=load('mw_mail_v6',[]);
+save(KEYS.catalog,catalog);save(KEYS.receipts,receipts);save(KEYS.requests,requests);save(KEYS.mail,mail);
+
+let draft=null;
+let requestOriginReceiptId=null;
+let pendingEmails=load(KEYS.pendingEmails,[]);
+if(!Array.isArray(pendingEmails))pendingEmails=[];
+const oldPendingV7=load('mw_pending_email_v7',null);
+if(oldPendingV7 && !pendingEmails.some(x=>x.id===oldPendingV7.id)){
+  pendingEmails.push(oldPendingV7);
+  save(KEYS.pendingEmails,pendingEmails);
+}
+const OCR_CONFIDENCE_REVIEW_THRESHOLD=80;
+
+function show(view){
+  ['home','receive','oracle','requests','mail','meds'].forEach(x=>{
+    $(x+'View').classList.toggle('hidden',x!==view);
+    const b=$('tab'+x.charAt(0).toUpperCase()+x.slice(1));
+    if(b)b.classList.toggle('active',x===view);
+  });
+  if(view==='home')renderHome();
+  if(view==='requests')renderRequests();
+  if(view==='mail')renderMail();
+  if(view==='meds')renderMeds();
+}
+$('tabHome').onclick=()=>show('home');
+$('tabReceive').onclick=()=>show('receive');
+$('tabOracle').onclick=()=>show('oracle');
+$('tabRequests').onclick=()=>show('requests');
+$('tabMail').onclick=()=>show('mail');
+$('tabMeds').onclick=()=>show('meds');
+
+function parseAlertDays(s){
+  return [...new Set(String(s||'').split(',').map(x=>parseInt(x.trim(),10)).filter(x=>Number.isInteger(x)&&x>=0&&x<=3650))].sort((a,b)=>b-a);
+}
+function dateObj(s){const p=String(s||'').split('-').map(Number);return p.length===3?new Date(Date.UTC(p[0],p[1]-1,p[2])):null}
+function today(){const d=new Date();return new Date(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate()))}
+function daysLeft(s){const d=dateObj(s);return d?Math.ceil((d-today())/86400000):null}
+function isDateOrderValid(prod,exp){
+  const p=dateObj(prod),e=dateObj(exp);
+  return !!(p&&e&&p.getTime()<e.getTime());
+}
+function alertState(r){
+  if(!r.activatedForAlerts)return null;
+  const d=daysLeft(r.expiryDate);
+  if(d===null)return null;
+  if(d<0)return {kind:'expired',days:d};
+
+  // Choose the nearest threshold that has already been entered.
+  // Example [45,20,10,2] with 18 days left => 20.
+  const eligible=(r.alertDays||[])
+    .filter(x=>Number.isInteger(x)&&x>=d)
+    .sort((a,b)=>a-b);
+  const th=eligible.length?eligible[0]:undefined;
+  return th===undefined?null:{kind:'near',days:d,threshold:th};
+}
+function canonicalDateFromParts(a,b,c,orderHint=null){
+  let x=Number(a),y=Number(b),z=Number(c);
+  if(z<100)z+=2000;
+  if(z<2000||z>2100)return {date:null,ambiguous:false};
+
+  if(orderHint==='YMD'){
+    const month=y,day=Number(c);
+    // This branch is not used for three-argument DMY input.
+  }
+
+  // When both first values are <=12, DD/MM and MM/DD are both plausible.
+  if(x>=1&&x<=12&&y>=1&&y<=12){
+    return {date:null,ambiguous:true,raw:`${a}/${b}/${c}`};
+  }
+  let day=x,month=y;
+  if(x<=12 && y>12){month=x;day=y}
+  if(day<1||day>31||month<1||month>12)return {date:null,ambiguous:false};
+  return {date:`${z}-${String(month).padStart(2,'0')}-${String(day).padStart(2,'0')}`,ambiguous:false};
+}
+function extractDateCandidates(text){
+  const out=[];
+  let ambiguous=false;
+  let m;
+
+  // ISO-like YYYY-MM-DD is unambiguous.
+  const ymd=/\b(20\d{2})[\/\-.](\d{1,2})[\/\-.](\d{1,2})\b/g;
+  while((m=ymd.exec(text))){
+    const y=Number(m[1]),mo=Number(m[2]),d=Number(m[3]);
+    if(mo>=1&&mo<=12&&d>=1&&d<=31){
+      const v=`${y}-${String(mo).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+      if(!out.includes(v))out.push(v);
+    }
+  }
+
+  const dmy=/\b(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})\b/g;
+  while((m=dmy.exec(text))){
+    const r=canonicalDateFromParts(m[1],m[2],m[3]);
+    if(r.ambiguous){ambiguous=true;continue}
+    if(r.date&&!out.includes(r.date))out.push(r.date);
+  }
+  return {dates:out,ambiguous};
+}
+function labeledDateResult(text,labelRegex){
+  const lines=text.split(/\r?\n/);
+  const anyDateLabel=/(MFG|MFD|MANUF|PROD|PRODUCTION|START|EXP|EXPIRY|EXPIRATION|END|USE.?BY|تاريخ.?الانتاج|انتهاء)/i;
+
+  for(let i=0;i<lines.length;i++){
+    // Reset state for global/sticky regex safety.
+    labelRegex.lastIndex=0;
+    if(!labelRegex.test(lines[i]))continue;
+
+    // Safest case: the labeled line itself contains exactly one date.
+    const same=extractDateCandidates(lines[i]);
+    if(same.ambiguous)return {date:null,ambiguous:true,multiple:false};
+    if(same.dates.length===1)return {date:same.dates[0],ambiguous:false,multiple:false};
+    if(same.dates.length>1)return {date:null,ambiguous:false,multiple:true,candidates:same.dates};
+
+    // Secondary supported layout: label on one line, its date alone on the next line.
+    const next=lines[i+1]||'';
+    if(next){
+      anyDateLabel.lastIndex=0;
+      const nextHasAnotherLabel=anyDateLabel.test(next);
+      const nr=extractDateCandidates(next);
+      if(nr.ambiguous)return {date:null,ambiguous:true,multiple:false};
+      if(!nextHasAnotherLabel && nr.dates.length===1){
+        return {date:nr.dates[0],ambiguous:false,multiple:false};
+      }
+      if(!nextHasAnotherLabel && nr.dates.length>1){
+        return {date:null,ambiguous:false,multiple:true,candidates:nr.dates};
+      }
+    }
+  }
+  return {date:null,ambiguous:false,multiple:false};
+}
+async function ocr(file,statusId){
+  if(!file)throw new Error('اختر صورة أولًا.');
+  if(!window.Tesseract)throw new Error('تعذر تحميل قارئ النص. تأكد من اتصال الإنترنت ثم أعد فتح التطبيق.');
+  $(statusId).textContent='جاري قراءة الصورة...';
+  const r=await Tesseract.recognize(file,'eng',{
+    logger:m=>{if(m.status==='recognizing text')$(statusId).textContent=`جاري قراءة النص ${Math.round((m.progress||0)*100)}%`}
+  });
+  const confidence=Number(r.data.confidence||0);
+  $(statusId).textContent=`اكتملت القراءة — ثقة OCR التقريبية ${Math.round(confidence)}%`;
+  return {text:r.data.text||'',confidence};
+}
+
+
+/* -------- One-time catalog import -------- */
+function parseCsvLine(line){
+  const out=[];let cur='',q=false;
+  for(let i=0;i<line.length;i++){
+    const ch=line[i];
+    if(ch==='"'){
+      if(q&&line[i+1]==='"'){cur+='"';i++}else q=!q;
+    }else if(ch===','&&!q){out.push(cur.trim());cur=''}
+    else cur+=ch;
+  }
+  out.push(cur.trim());return out;
+}
+$('importCatalogBtn').onclick=async()=>{
+  const file=$('catalogFile').files[0];
+  if(!file){$('catalogImportStatus').textContent='اختر ملف CSV أولًا.';return}
+  const text=await file.text();
+  const lines=text.split(/\r?\n/).filter(x=>x.trim());
+  if(lines.length<2){$('catalogImportStatus').textContent='الملف لا يحتوي بيانات كافية.';return}
+  const headers=parseCsvLine(lines[0]).map(x=>x.trim());
+  const required=['barcode','name','code','alertDays'];
+  if(required.some(x=>!headers.includes(x))){
+    $('catalogImportStatus').textContent='يلزم وجود الأعمدة barcode,name,code,alertDays جميعها.';
+    return;
+  }
+  let imported=0,skipped=0,conflicts=0;
+  for(const line of lines.slice(1)){
+    const cols=parseCsvLine(line);
+    const row={};headers.forEach((h,i)=>row[h]=(cols[i]||'').trim());
+    if(!row.barcode||!row.name||!row.code){skipped++;continue}
+    const alertDays=parseAlertDays(row.alertDays||'');
+    if(!alertDays.length){skipped++;continue}
+
+    const productKey=normalizeProductKey(row.barcode);
+    const ex=catalog.find(x=>catalogKey(x)===productKey);
+    if(ex && (String(ex.code).trim()!==row.code || String(ex.name).trim()!==row.name)){
+      // Fail closed: an existing stable product-key mapping is never silently repointed.
+      conflicts++;
+      continue;
+    }
+
+    const obj={barcode:row.barcode,productKey,name:row.name,code:row.code,alertDays,
+      catalogSource:'CSV_IMPORT',catalogImportedAt:new Date().toISOString()};
+    if(ex)Object.assign(ex,obj);else catalog.push(obj);
+    imported++;
+  }
+  save(KEYS.catalog,catalog);
+  $('catalogImportStatus').textContent=
+    `تم استيراد/تحديث ${imported} صنف، وتجاوز ${skipped} صف ناقص، وحُجز ${conflicts} تعارض باركود للمراجعة دون استبدال الربط القائم.`;
+};
+
+
+function isValidGtin14(gtin){
+  const s=String(gtin||'');
+  if(!/^\d{14}$/.test(s))return false;
+  const digits=s.split('').map(Number);
+  const check=digits[13];
+  let sum=0;
+  for(let i=0;i<13;i++){
+    // From the right of the body, weights alternate 3,1.
+    const weight=((12-i)%2===0)?3:1;
+    sum+=digits[i]*weight;
+  }
+  const expected=(10-(sum%10))%10;
+  return expected===check;
+}
+function normalizeProductKey(raw){
+  let s=String(raw||'').trim();
+  if(!s)return '';
+
+  // Remove common GS1 symbology identifier from decoded DataMatrix.
+  s=s.replace(/^\]d2/i,'');
+
+  // Human-readable AI syntax: (01) + 14 digit GTIN.
+  let m=s.match(/\(01\)\s*(\d{14})/);
+  if(m && isValidGtin14(m[1]))return `GTIN:${m[1]}`;
+
+  // Raw GS1 element string beginning with AI 01.
+  m=s.match(/^01(\d{14})/);
+  if(m && isValidGtin14(m[1]))return `GTIN:${m[1]}`;
+
+  // Some scanners may return only the GTIN itself.
+  if(/^\d{14}$/.test(s) && isValidGtin14(s))return `GTIN:${s}`;
+
+  // Invalid/unknown input is never promoted to GTIN identity.
+  return `RAW:${s}`;
+}
+function catalogKey(item){
+  return item.productKey || normalizeProductKey(item.barcode);
+}
+
+/* -------- Barcode -------- */
+$('scanBarcodeBtn').onclick=async()=>{
+  const file=$('barcodeImage').files[0];
+  if(!file){$('barcodeStatus').textContent='اختر صورة الباركود أولًا.';return}
+  $('barcodeStatus').textContent='جاري قراءة الباركود...';
+  try{
+    if(!window.Html5Qrcode)throw new Error('قارئ الباركود غير متاح.');
+    const scanner=new Html5Qrcode('barcodeStatus');
+    const result=await scanner.scanFile(file,true);
+    try{await scanner.clear()}catch{}
+    $('rawBarcode').value=result;
+    const productKey=normalizeProductKey(result);
+    const item=catalog.find(x=>catalogKey(x)===productKey);
+    if(item){
+      $('recvDrugName').value=item.name;
+      $('recvDrugCode').value=item.code;
+      $('recvAlertDays').value=(item.alertDays||[]).join(',');
+      $('barcodeStatus').textContent='تم التعرف على الصنف واستعادة بياناته المحفوظة.';
+    }else{
+      $('barcodeStatus').textContent='تمت قراءة الباركود. هذا الصنف غير محفوظ محليًا بعد؛ راجع اسمه والكود مرة واحدة.';
+    }
+  }catch(e){
+    $('barcodeStatus').textContent='تعذرت القراءة الآلية من هذه الصورة. يمكنك إعادة التصوير بوضوح أكبر.';
+  }
+};
+
+/* -------- Printed package dates -------- */
+$('readDatesBtn').onclick=async()=>{
+  try{
+    const o=await ocr($('dateImage').files[0],'dateOcrStatus');
+    const prod=labeledDateResult(o.text,/(MFG|MFD|MANUF|PROD|PRODUCTION|تاريخ.?الانتاج)/i);
+    const exp=labeledDateResult(o.text,/(EXP|EXPIRY|EXPIRATION|USE.?BY|انتهاء)/i);
+    const all=extractDateCandidates(o.text);
+
+    if(o.confidence<OCR_CONFIDENCE_REVIEW_THRESHOLD){
+      $('dateOcrStatus').textContent += ' — القراءة منخفضة الثقة؛ لن تُعتمد آليًا. راجع التاريخين يدويًا.';
+      return;
+    }
+    if(prod.ambiguous||exp.ambiguous||all.ambiguous){
+      $('dateOcrStatus').textContent += ' — يوجد تاريخ رقمي ملتبس بين يوم/شهر وشهر/يوم؛ لا تخمين آلي. راجع العبوة.';
+      return;
+    }
+
+    // We only auto-fill when production/expiry labels were actually recognized.
+    // No "first date = production / second date = expiry" guessing.
+    if(!prod.date||!exp.date){
+      $('dateOcrStatus').textContent += ' — تم رصد تاريخ/تواريخ لكن لم يُحسم أيها إنتاج وأيها انتهاء. راجع العبوة وأدخل التاريخين.';
+      return;
+    }
+
+    $('recvProdDate').value=prod.date;
+    $('recvExpiryDate').value=exp.date;
+    $('dateOcrStatus').textContent += ' — راجع التاريخين الظاهرين قبل الاعتماد.';
+  }catch(e){$('dateOcrStatus').textContent=e.message}
+};
+
+$('saveReceiptBtn').onclick=()=>{
+  const barcode=$('rawBarcode').value.trim();
+  const name=$('recvDrugName').value.trim();
+  const code=$('recvDrugCode').value.trim();
+  const prod=$('recvProdDate').value;
+  const exp=$('recvExpiryDate').value;
+  const alertDays=parseAlertDays($('recvAlertDays').value);
+  if(!barcode||!name||!code||!prod||!exp||!alertDays.length){
+    $('receiveMessage').innerHTML='<div class="error">أكمل الباركود واسم الدواء والكود والتاريخين وسياسة التنبيه الخاصة بالصنف.</div>';return
+  }
+  if(!isDateOrderValid(prod,exp)){
+    $('receiveMessage').innerHTML='<div class="error">تاريخ الإنتاج يجب أن يكون أسبق من تاريخ الانتهاء. راجع التاريخين على العبوة.</div>';return
+  }
+  const productKey=normalizeProductKey(barcode);
+  const existing=catalog.find(x=>catalogKey(x)===productKey);
+  if(existing){
+    existing.name=name;existing.code=code;existing.alertDays=alertDays;existing.productKey=productKey;
+  }else{
+    catalog.push({barcode,productKey,name,code,alertDays});
+  }
+  save(KEYS.catalog,catalog);
+
+  const capturedAt=new Date().toISOString();
+  receipts.unshift({
+    id:uid(),barcode,productKey,name,code,productionDate:prod,expiryDate:exp,alertDays,
+    alertPolicySnapshot:(alertDays||[]).join(','),
+    alertPolicyCapturedAt:capturedAt,
+    receivedAt:capturedAt,
+    oracleStatus:'PENDING',
+    oracleComparisons:[],
+    // Expiry monitoring starts from the keeper-approved package date.
+    // Oracle reconciliation is a separate control and must never suppress the safety alert.
+    activatedForAlerts:true
+  });
+  save(KEYS.receipts,receipts);
+  $('receiveMessage').innerHTML='<div class="ok">تم حفظ التاريخين الممسوحين من العبوة كمرجع. الخطوة التالية: أدخل البيانات في Oracle ثم صوّر تقرير الإدخال للمطابقة.</div>';
+  ['rawBarcode','recvDrugName','recvDrugCode','recvProdDate','recvExpiryDate','recvAlertDays'].forEach(id=>$(id).value='');
+  $('barcodeImage').value='';$('dateImage').value='';
+  renderHome();
+};
+
+/* -------- Oracle comparison -------- */
+function escapeRegex(s){
+  return String(s).replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+}
+function lineHasExactCode(line,code){
+  const e=escapeRegex(String(code).trim());
+  if(!e)return false;
+  // Prevent MED01 from matching MED010 or XMED01Y.
+  const re=new RegExp(`(^|[^A-Za-z0-9_])${e}($|[^A-Za-z0-9_])`,'i');
+  return re.test(line);
+}
+function allCodeContexts(text,code){
+  const lines=text.split(/\r?\n/);
+  const contexts=[];
+  lines.forEach((line,idx)=>{
+    if(lineHasExactCode(line,code)){
+      contexts.push({
+        key:`line:${idx}`,
+        lineIndex:idx,
+        text:lines.slice(Math.max(0,idx-3),Math.min(lines.length,idx+6)).join('\n')
+      });
+    }
+  });
+  return contexts;
+}
+function parseOracleContext(ctx){
+  const prod=labeledDateResult(ctx.text,/(MFG|MFD|MANUF|PROD|PRODUCTION|START|تاريخ.?الانتاج)/i);
+  const exp=labeledDateResult(ctx.text,/(EXP|EXPIRY|EXPIRATION|END|انتهاء)/i);
+  const all=extractDateCandidates(ctx.text);
+
+  if(prod.ambiguous||exp.ambiguous||all.ambiguous){
+    return {...ctx,status:'AMBIGUOUS_DATE',prod:null,exp:null};
+  }
+
+  // FAIL CLOSED: do not infer "first date = production, second = expiry"
+  // when labels/columns were not recognized.
+  if(!prod.date||!exp.date){
+    return {...ctx,status:'UNREADABLE',prod:prod.date||null,exp:exp.date||null};
+  }
+
+  return {...ctx,status:'PARSED',prod:prod.date,exp:exp.date};
+}
+function compareReceiptToOracle(r,text,ocrConfidence,usedRows){
+  if(ocrConfidence<OCR_CONFIDENCE_REVIEW_THRESHOLD){
+    return {status:'LOW_CONFIDENCE',oracleProd:null,oracleExp:null,candidateCount:0,rowKey:null};
+  }
+
+  const contexts=allCodeContexts(text,r.code);
+  if(!contexts.length){
+    return {status:'NOT_FOUND',oracleProd:null,oracleExp:null,candidateCount:0,rowKey:null};
+  }
+
+  const parsed=contexts.map(parseOracleContext);
+
+  if(parsed.some(x=>x.status==='AMBIGUOUS_DATE')){
+    return {status:'AMBIGUOUS_DATE',oracleProd:null,oracleExp:null,candidateCount:contexts.length,rowKey:null};
+  }
+
+  const valid=parsed.filter(x=>x.status==='PARSED');
+  if(!valid.length){
+    return {status:'UNREADABLE',oracleProd:null,oracleExp:null,candidateCount:contexts.length,rowKey:null};
+  }
+
+  const unused=valid.filter(x=>!usedRows.has(x.key));
+  if(!unused.length){
+    return {status:'ROW_ALREADY_USED',oracleProd:null,oracleExp:null,candidateCount:contexts.length,rowKey:null};
+  }
+
+  const exact=unused.filter(x=>x.prod===r.productionDate&&x.exp===r.expiryDate);
+
+  // One exact unused row => safe one-to-one allocation.
+  if(exact.length===1){
+    usedRows.add(exact[0].key);
+    return {
+      status:'MATCH',
+      oracleProd:exact[0].prod,
+      oracleExp:exact[0].exp,
+      prodMatch:true,
+      expMatch:true,
+      candidateCount:contexts.length,
+      exactMatchCount:1,
+      rowKey:exact[0].key
+    };
+  }
+
+  // Multiple indistinguishable exact rows => do not arbitrarily choose one.
+  if(exact.length>1){
+    return {
+      status:'AMBIGUOUS_ROW',
+      oracleProd:null,
+      oracleExp:null,
+      candidateCount:contexts.length,
+      exactMatchCount:exact.length,
+      rowKey:null
+    };
+  }
+
+  // If there is exactly one unused parsed row for this code, an explicit mismatch
+  // is safe to report and allocate to this receipt.
+  if(unused.length===1){
+    const one=unused[0];
+    usedRows.add(one.key);
+    return {
+      status:'MISMATCH',
+      oracleProd:one.prod,
+      oracleExp:one.exp,
+      prodMatch:one.prod===r.productionDate,
+      expMatch:one.exp===r.expiryDate,
+      candidateCount:contexts.length,
+      rowKey:one.key
+    };
+  }
+
+  // More than one plausible unused row and none exactly matches: human review.
+  return {
+    status:'AMBIGUOUS_ROW',
+    oracleProd:null,
+    oracleExp:null,
+    candidateCount:contexts.length,
+    rowKey:null
+  };
+}
+$('readOracleBtn').onclick=async()=>{
+  try{
+    const files=[...$('oracleImage').files];
+    if(!files.length){$('oracleStatus').textContent='اختر صورة تقرير Oracle أولًا.';return}
+
+    const pageTexts=[];
+    const confidences=[];
+    for(let i=0;i<files.length;i++){
+      $('oracleStatus').textContent=`قراءة صفحة ${i+1} من ${files.length}...`;
+      const o=await ocr(files[i],'oracleStatus');
+      pageTexts.push(`\n--- PAGE ${i+1} ---\n${o.text}`);
+      confidences.push(o.confidence);
+    }
+    const text=pageTexts.join('\n');
+    const overallConfidence=Math.min(...confidences);
+
+    const pending=receipts.filter(r=>r.oracleStatus!=='MATCH');
+    if(!pending.length){$('oracleResults').innerHTML='<div class="ok">لا توجد سجلات استلام تنتظر المطابقة.</div>';return}
+    let out='';
+    let matches=0,mismatches=0,review=0;
+    const comparedAt=new Date().toISOString();
+    const usedRows=new Set();
+
+    pending.forEach(r=>{
+      const c=compareReceiptToOracle(r,text,overallConfidence,usedRows);
+      r.oracleComparisons=Array.isArray(r.oracleComparisons)?r.oracleComparisons:[];
+      r.oracleComparisons.push({
+        comparedAt,
+        result:c.status,
+        oracleProductionDate:c.oracleProd,
+        oracleExpiryDate:c.oracleExp,
+        candidateCount:c.candidateCount||0,
+        oracleRowKey:c.rowKey||null,
+        ocrConfidence:overallConfidence
+      });
+
+      if(c.status==='MATCH'){
+        matches++;
+        r.oracleStatus='MATCH';
+        r.oracleProductionDate=c.oracleProd;
+        r.oracleExpiryDate=c.oracleExp;
+        r.oracleComparedAt=comparedAt;
+        r.activatedForAlerts=true;
+      }else if(c.status==='MISMATCH'){
+        mismatches++;
+        r.oracleStatus='MISMATCH';
+        r.oracleProductionDate=c.oracleProd;
+        r.oracleExpiryDate=c.oracleExp;
+        r.oracleComparedAt=comparedAt;
+        r.activatedForAlerts=true;
+      }else{
+        review++;
+        r.oracleStatus='REVIEW_REQUIRED';
+        r.oracleComparedAt=comparedAt;
+        r.activatedForAlerts=true;
+      }
+
+      const readableProd=c.oracleProd||'غير محسوم';
+      const readableExp=c.oracleExp||'غير محسوم';
+      let message='';
+      if(c.status==='MATCH') message='مطابق — مطابقة Oracle ناجحة، ومتابعة الصلاحية مستمرة من بيانات العبوة.';
+      else if(c.status==='MISMATCH') message='يوجد اختلاف مؤكد في أحد التاريخين — راجع الإدخال في Oracle.';
+      else if(c.status==='AMBIGUOUS_ROW') message='ظهر نفس الكود في أكثر من صف ولم يوجد تطابق كامل؛ لا يختار التطبيق صفًا بالتخمين.';
+      else if(c.status==='AMBIGUOUS_DATE') message='تاريخ التقرير ملتبس بين يوم/شهر وشهر/يوم؛ يلزم مراجعة بشرية.';
+      else if(c.status==='LOW_CONFIDENCE') message='ثقة قراءة OCR منخفضة؛ لا يسمح التطبيق بإصدار PASS.';
+      else if(c.status==='ROW_ALREADY_USED') message='صف Oracle المطابق سبق ربطه بسجل استلام آخر؛ لا يسمح التطبيق بإعادة استخدامه.';
+      else if(c.status==='NOT_FOUND') message='لم يعثر التطبيق على الكود في صور التقرير.';
+      else message='تعذرت قراءة التاريخين بوضوح؛ يلزم المراجعة.';
+
+      out+=`<div class="card case ${c.status==='MATCH'?'':'bad'}">
+        <strong>${esc(r.name)}</strong><br>
+        <span class="meta">الكود: ${esc(r.code)} — مرات ظهور الكود: ${c.candidateCount||0}</span><br>
+        <div style="margin-top:8px">
+          تاريخ الإنتاج: العبوة <strong>${r.productionDate}</strong> ↔ Oracle <strong>${readableProd}</strong>
+          ${c.status==='MATCH'||c.status==='MISMATCH'?(c.prodMatch?' ✅':' ❌'):''}<br>
+          تاريخ الانتهاء: العبوة <strong>${r.expiryDate}</strong> ↔ Oracle <strong>${readableExp}</strong>
+          ${c.status==='MATCH'||c.status==='MISMATCH'?(c.expMatch?' ✅':' ❌'):''}
+        </div>
+        <div class="${c.status==='MATCH'?'ok':'error'}">${message}</div>
+      </div>`;
+    });
+
+    save(KEYS.receipts,receipts);
+    $('oracleResults').innerHTML=
+      `<div class="notice"><strong>ملخص:</strong> مطابق ${matches} — مختلف مؤكد ${mismatches} — يحتاج مراجعة ${review} — أقل ثقة OCR للصفحات ${Math.round(overallConfidence)}%</div>`+out;
+    renderHome();showStartupAlerts();
+  }catch(e){$('oracleStatus').textContent=e.message}
+};
+
+/* -------- Alerts / Home -------- */
+function openRequests(){return requests.filter(r=>!r.closedAt)}
+function activeExpiryAlerts(){return receipts.map(r=>({r,s:alertState(r)})).filter(x=>x.s)}
+function renderHome(){
+  const a=activeExpiryAlerts(),o=openRequests(),p=receipts.filter(r=>r.oracleStatus==='PENDING'),m=receipts.filter(r=>r.oracleStatus==='MISMATCH');
+  $('homeSummary').innerHTML=
+    `<div class="${a.length?'notice':'ok'}"><strong>تنبيهات الصلاحية:</strong> ${a.length}</div>
+     <div class="${o.length?'notice':'ok'}"><strong>ريكوستات مفتوحة:</strong> ${o.length}</div>
+     <div class="${pendingEmails.length?'notice':'ok'}"><strong>رسائل مجهزة تنتظر تأكيد الإرسال:</strong> ${pendingEmails.length}</div>
+     <div class="${p.length?'notice':'ok'}"><strong>استلامات تنتظر مطابقة Oracle:</strong> ${p.length}</div>
+     <div class="${m.length?'error':'ok'}"><strong>اختلافات Oracle تحتاج مراجعة:</strong> ${m.length}</div>`;
+}
+function showStartupAlerts(){
+  const a=activeExpiryAlerts(),o=openRequests(),pe=pendingEmails;
+  if(!a.length&&!o.length&&!pe.length){$('startupAlert').classList.add('hidden');return}
+  let h='';
+  if(a.length){
+    h+=`<div class="notice"><strong>أدوية تحتاج متابعة صلاحية: ${a.length}</strong></div>`;
+    h+=a.map(({r,s})=>`<div class="card case bad">
+      <strong>${esc(r.name)}</strong><br>
+      <span class="meta">${esc(r.code)} — ${s.kind==='expired'?`منتهي منذ ${Math.abs(s.days)} يوم`:`متبقي ${s.days} يوم — عتبة هذا الصنف ${s.threshold} يوم`}</span>
+      <button class="secondary" onclick="expiryToRequest('${r.id}')">إنشاء ريكوست</button>
+    </div>`).join('');
+  }
+  if(o.length){
+    h+=`<div class="notice"><strong>ريكوستات مفتوحة: ${o.length}</strong></div>`;
+    h+=o.slice(0,15).map(r=>`<div class="card case"><strong>${esc(r.drug)}</strong><br><span class="meta">${typeLabel(r.type)} — ${new Date(r.sentAt).toLocaleString('ar-SA')}</span></div>`).join('');
+  }
+  if(pe.length){
+    h+=`<div class="notice"><strong>رسائل مجهزة تنتظر تأكيد الإرسال: ${pe.length}</strong></div>`;
+    h+=pe.slice(0,15).map(p=>`<div class="card case bad">
+      <strong>${esc(p.drug)}</strong><br>
+      <span class="meta">إلى: ${esc(p.recipient.name)} — جُهزت ${new Date(p.preparedAt).toLocaleString('ar-SA')}</span>
+      <button class="secondary" onclick="openPendingEmailReview()">فتح شاشة التأكيد</button>
+    </div>`).join('');
+  }
+  $('startupBody').innerHTML=h;$('startupAlert').classList.remove('hidden');
+}
+window.openPendingEmailReview=()=>{
+  $('startupAlert').classList.add('hidden');
+  show('requests');
+  renderPendingEmailConfirmation();
+  $('emailConfirmationCard').scrollIntoView({behavior:'smooth'});
+};
+$('startupClose').onclick=()=>$('startupAlert').classList.add('hidden');
+
+/* -------- Request -------- */
+function typeLabel(t){return t==='expiry'?'قرب انتهاء الصلاحية':t==='urgent'?'طلب دواء طارئ / غير مغطى':'إرجاع دواء منتهي الصلاحية'}
+$('requestType').onchange=()=>{
+  const t=$('requestType').value;
+  $('manualApprovalBox').classList.toggle('hidden',t==='expiry');
+  $('reqDates').classList.toggle('hidden',t==='urgent');
+  $('sectionHeadApproved').checked=false;
+  if(t!=='expiry')requestOriginReceiptId=null;
+};
+function refreshRecipients(){
+  const kind=$('recipientMode').value;
+  const list=mail.filter(x=>x.kind===kind);
+  $('recipientSelect').innerHTML=list.length?list.map(x=>`<option value="${x.id}">${esc(x.name)} — ${esc(x.role)} — ${esc(x.entity)} — ${esc(x.email)}</option>`).join(''):'<option value="">لا يوجد بريد محفوظ لهذا النوع</option>';
+}
+$('recipientMode').onchange=refreshRecipients;
+
+const REQUEST_EMAIL_TEMPLATE_VERSION='REQUEST_EMAIL_V1';
+const CONTROLLED_TRANSLATION_RULESET_VERSION='CONTROLLED_AR_EN_AR_V1';
+const CONTROLLED_AR_TO_EN={
+  'نأمل التكرم بمراجعة حالة الدواء الموضح أدناه لقرب انتهاء صلاحيته، والتوجيه بالإجراء المناسب.':
+    'Kindly review the medication listed below due to its approaching expiry date and advise on the appropriate action.',
+  'نأمل التكرم بتوفير الدواء الموضح أدناه، واتخاذ ما يلزم حيال الطلب.':
+    'Kindly arrange the medication listed below and take the necessary action regarding this request.',
+  'نأمل التكرم باستكمال إجراءات إرجاع الدواء المنتهي الصلاحية الموضح أدناه.':
+    'Kindly proceed with the return process for the expired medication listed below.'
+};
+const CONTROLLED_EN_TO_AR=Object.fromEntries(
+  Object.entries(CONTROLLED_AR_TO_EN).map(([ar,en])=>[en,ar])
+);
+
+function translateControlledArabicLineToEnglish(line){
+  if(line==='')return {ok:true,line:''};
+
+  if(line==='صباح الخير أيها الفريق،')return {ok:true,line:'Good morning Team,'};
+  if(line==='مساء الخير أيها الفريق،')return {ok:true,line:'Good afternoon Team,'};
+
+  let m=line.match(/^صباح الخير (.+)،$/);
+  if(m)return {ok:true,line:`Good morning ${m[1]},`};
+  m=line.match(/^مساء الخير (.+)،$/);
+  if(m)return {ok:true,line:`Good afternoon ${m[1]},`};
+
+  if(CONTROLLED_AR_TO_EN[line])return {ok:true,line:CONTROLLED_AR_TO_EN[line]};
+
+  const prefixes=[
+    ['اسم الدواء: ','Drug Name: '],
+    ['الكود المعتمد: ','Approved Code: '],
+    ['تاريخ الإنتاج: ','Production Date: '],
+    ['تاريخ الانتهاء: ','Expiry Date: ']
+  ];
+  for(const [ar,en] of prefixes){
+    if(line.startsWith(ar))return {ok:true,line:en+line.slice(ar.length)};
+  }
+
+  return {ok:false,error:`UNSUPPORTED_AR_LINE: ${line}`};
+}
+function translateControlledEnglishLineToArabic(line){
+  if(line==='')return {ok:true,line:''};
+
+  if(line==='Good morning Team,')return {ok:true,line:'صباح الخير أيها الفريق،'};
+  if(line==='Good afternoon Team,')return {ok:true,line:'مساء الخير أيها الفريق،'};
+
+  let m=line.match(/^Good morning (.+),$/);
+  if(m)return {ok:true,line:`صباح الخير ${m[1]}،`};
+  m=line.match(/^Good afternoon (.+),$/);
+  if(m)return {ok:true,line:`مساء الخير ${m[1]}،`};
+
+  if(CONTROLLED_EN_TO_AR[line])return {ok:true,line:CONTROLLED_EN_TO_AR[line]};
+
+  const prefixes=[
+    ['Drug Name: ','اسم الدواء: '],
+    ['Approved Code: ','الكود المعتمد: '],
+    ['Production Date: ','تاريخ الإنتاج: '],
+    ['Expiry Date: ','تاريخ الانتهاء: ']
+  ];
+  for(const [en,ar] of prefixes){
+    if(line.startsWith(en))return {ok:true,line:ar+line.slice(en.length)};
+  }
+
+  return {ok:false,error:`UNSUPPORTED_EN_LINE: ${line}`};
+}
+function translateControlledArabicToEnglish(arText){
+  const out=[];
+  for(const line of String(arText).split('\n')){
+    const r=translateControlledArabicLineToEnglish(line);
+    if(!r.ok)return r;
+    out.push(r.line);
+  }
+  return {ok:true,text:out.join('\n')};
+}
+function backTranslateControlledEnglishToArabic(enText){
+  const out=[];
+  for(const line of String(enText).split('\n')){
+    const r=translateControlledEnglishLineToArabic(line);
+    if(!r.ok)return r;
+    out.push(r.line);
+  }
+  return {ok:true,text:out.join('\n')};
+}
+
+function englishSubject(t,drug){
+  return t==='expiry'?`Request - Near Expiry - ${drug}`:t==='urgent'?`Request - Medication Supply - ${drug}`:`Request - Expired Medication Return - ${drug}`;
+}
+function greetEn(){return new Date().getHours()<12?'Good morning':'Good afternoon'}
+function greetAr(){return new Date().getHours()<12?'صباح الخير':'مساء الخير'}
+function bodyAr(t,drug,code,prod,exp){
+  let p=t==='expiry'?'نأمل التكرم بمراجعة حالة الدواء الموضح أدناه لقرب انتهاء صلاحيته، والتوجيه بالإجراء المناسب.':
+        t==='urgent'?'نأمل التكرم بتوفير الدواء الموضح أدناه، واتخاذ ما يلزم حيال الطلب.':
+        'نأمل التكرم باستكمال إجراءات إرجاع الدواء المنتهي الصلاحية الموضح أدناه.';
+  let l=[p,'',`اسم الدواء: ${drug}`,`الكود المعتمد: ${code}`];
+  if(t!=='urgent'){l.push(`تاريخ الإنتاج: ${prod}`);l.push(`تاريخ الانتهاء: ${exp}`)}
+  return l.join('\n');
+}
+
+$('generateRequestBtn').onclick=()=>{
+  const t=$('requestType').value,drug=$('reqDrugName').value.trim(),code=$('reqDrugCode').value.trim();
+  const prod=$('reqProdDate').value,exp=$('reqExpiryDate').value,rec=mail.find(x=>x.id===$('recipientSelect').value);
+  if(!drug||!code||!rec){$('requestMessage').innerHTML='<div class="error">أكمل بيانات الدواء واختر المستلم.</div>';return}
+  if(t!=='urgent'&&(!prod||!exp)){$('requestMessage').innerHTML='<div class="error">أدخل تاريخ الإنتاج والانتهاء.</div>';return}
+  if(t!=='urgent'&&!isDateOrderValid(prod,exp)){
+    $('requestMessage').innerHTML='<div class="error">تاريخ الإنتاج يجب أن يكون أسبق من تاريخ الانتهاء.</div>';return
+  }
+
+  const isManual=(t!=='expiry');
+  if(isManual&&!$('sectionHeadApproved').checked){
+    $('requestMessage').innerHTML='<div class="error">يلزم تسجيل موافقة رئيس القسم لهذه الفئة.</div>';return
+  }
+  if(t==='expiry'&&!requestOriginReceiptId){
+    $('requestMessage').innerHTML='<div class="error">ريكوست قرب انتهاء الصلاحية ينشأ من تنبيه الدواء داخل التطبيق، وليس كطلب يدوي مستقل.</div>';return
+  }
+  if(t==='expiry' && (openExpiryRequestForReceipt(requestOriginReceiptId) || pendingExpiryEmailForReceipt(requestOriginReceiptId))){
+    $('requestMessage').innerHTML='<div class="error">توجد حالة أو رسالة قرب انتهاء قائمة بالفعل لهذا السجل. لا يمكن إنشاء نسخة مكررة.</div>';return
+  }
+
+  const initiationSource=isManual?$('requestSource').value:'SYSTEM_ALERT';
+  const sourceReceiptId=isManual?null:requestOriginReceiptId;
+  const approvalRecordedAt=isManual?new Date().toISOString():null;
+
+  const salAr=$('recipientMode').value==='team'?`${greetAr()} أيها الفريق،`:`${greetAr()} ${rec.name}،`;
+  const sourceAr=[salAr,'',bodyAr(t,drug,code,prod,exp)].join('\n');
+
+  // Actual controlled transformation: exact Arabic source -> English -> Arabic back-translation.
+  const forward=translateControlledArabicToEnglish(sourceAr);
+  if(!forward.ok){
+    $('requestMessage').innerHTML='<div class="error">تعذر تحويل النص العربي إلى الإنجليزية ضمن القالب المعتمد. لم يُنشأ البريد.</div>';
+    return;
+  }
+  const en=forward.text;
+
+  const reverse=backTranslateControlledEnglishToArabic(en);
+  if(!reverse.ok){
+    $('requestMessage').innerHTML='<div class="error">تعذرت الترجمة العكسية للنص الإنجليزي. لم يُنشأ البريد.</div>';
+    return;
+  }
+  const back=reverse.text;
+
+  // Round-trip must reproduce the exact controlled Arabic source.
+  if(back!==sourceAr){
+    $('requestMessage').innerHTML='<div class="error">فشل فحص التطابق العربي بعد الترجمة العكسية. لم يُنشأ البريد.</div>';
+    return;
+  }
+
+  const ar=sourceAr;
+
+  draft={
+    id:uid(),type:t,drug,code,prod,exp,recipient:rec,
+    subject:englishSubject(t,drug),ar,en,back,
+    emailTemplateVersion:REQUEST_EMAIL_TEMPLATE_VERSION,
+    translationMode:'CONTROLLED_EXACT_AR_EN_AR',
+    translationRulesetVersion:CONTROLLED_TRANSLATION_RULESET_VERSION,
+    translationRoundTripVerified:true,
+    initiationSource,
+    sourceReceiptId,
+    sectionHeadApprovalRecorded:isManual,
+    sectionHeadApprovalRecordedAt:approvalRecordedAt,
+    sectionHeadApprovalEvidence:isManual?'WAREHOUSE_KEEPER_RECORDED_SECTION_HEAD_APPROVAL':null
+  };
+
+  // Approval/origin are consumed by this draft; they cannot leak into the next request.
+  $('sectionHeadApproved').checked=false;
+  requestOriginReceiptId=null;
+
+  $('subjectEn').textContent=draft.subject;$('requestAr').textContent=ar;$('requestEn').textContent=en;$('backAr').textContent=back;
+  $('approveMeaning').checked=false;$('openMailBtn').disabled=true;$('reviewCard').classList.remove('hidden');
+  $('reviewCard').scrollIntoView({behavior:'smooth'});
+};
+$('approveMeaning').onchange=()=>$('openMailBtn').disabled=!$('approveMeaning').checked;
+function persistPendingEmails(){
+  save(KEYS.pendingEmails,pendingEmails);
+}
+function setPendingEmail(d,method){
+  const item={
+    id:d.id,
+    type:d.type,drug:d.drug,code:d.code,prod:d.prod,exp:d.exp,
+    recipient:d.recipient,subject:d.subject,ar:d.ar,en:d.en,back:d.back,
+    emailTemplateVersion:d.emailTemplateVersion,
+    translationMode:d.translationMode,
+    translationRulesetVersion:d.translationRulesetVersion,
+    translationRoundTripVerified:d.translationRoundTripVerified,
+    initiationSource:d.initiationSource,
+    sourceReceiptId:d.sourceReceiptId,
+    sectionHeadApprovalRecorded:d.sectionHeadApprovalRecorded,
+    sectionHeadApprovalRecordedAt:d.sectionHeadApprovalRecordedAt,
+    sectionHeadApprovalEvidence:d.sectionHeadApprovalEvidence,
+    preparedAt:new Date().toISOString(),
+    preparedMethod:method,
+    deliveryProof:'USER_CONFIRMATION_ONLY'
+  };
+
+  const idx=pendingEmails.findIndex(x=>x.id===item.id);
+  if(idx>=0)pendingEmails[idx]=item;
+  else pendingEmails.push(item);
+
+  persistPendingEmails();
+  renderPendingEmailConfirmation();
+}
+function renderPendingEmailConfirmation(){
+  if(!pendingEmails.length){
+    $('emailConfirmationCard').classList.add('hidden');
+    $('emailConfirmationSummary').innerHTML='';
+    return;
+  }
+
+  $('emailConfirmationSummary').innerHTML=pendingEmails.map(p=>`
+    <div class="card case">
+      <strong>${esc(p.drug)}</strong><br>
+      <span class="meta">
+        إلى: ${esc(p.recipient.name)} — ${esc(p.recipient.email)}<br>
+        تم التجهيز: ${new Date(p.preparedAt).toLocaleString('ar-SA')}
+      </span>
+      <button class="primary" onclick="confirmPendingEmail('${p.id}')">نعم، أرسلت هذا البريد</button>
+      <button class="secondary" onclick="cancelPendingEmail('${p.id}')">لم أرسل هذا البريد</button>
+    </div>
+  `).join('');
+  $('emailConfirmationCard').classList.remove('hidden');
+}
+window.confirmPendingEmail=id=>{
+  const p=pendingEmails.find(x=>x.id===id);
+  if(!p)return;
+
+  if(!requests.some(x=>x.id===p.id)){
+    const confirmedAt=new Date().toISOString();
+    requests.unshift({
+      ...p,
+      status:'OPEN_WAITING_ACTION',
+      userConfirmedSentAt:confirmedAt,
+      sentAt:confirmedAt,
+      sentEvidence:'WAREHOUSE_KEEPER_EXPLICIT_CONFIRMATION',
+      closedAt:null,
+      events:[
+        {type:'EMAIL_PREPARED',at:p.preparedAt,method:p.preparedMethod},
+        {type:'EMAIL_SENT_CONFIRMED_BY_USER',at:confirmedAt}
+      ]
+    });
+    save(KEYS.requests,requests);
+  }
+
+  pendingEmails=pendingEmails.filter(x=>x.id!==id);
+  persistPendingEmails();
+  renderPendingEmailConfirmation();
+  renderRequests();renderHome();showStartupAlerts();
+};
+window.cancelPendingEmail=id=>{
+  pendingEmails=pendingEmails.filter(x=>x.id!==id);
+  persistPendingEmails();
+  renderPendingEmailConfirmation();
+  renderHome();showStartupAlerts();
+};
+$('openMailBtn').onclick=()=>{
+  if(!draft||!$('approveMeaning').checked)return;
+  setPendingEmail(draft,'MAILTO');
+  location.href=`mailto:${encodeURIComponent(draft.recipient.email)}?subject=${encodeURIComponent(draft.subject)}&body=${encodeURIComponent(draft.en)}`;
+};
+$('copyMailBtn').onclick=async()=>{
+  if(!draft)return;
+  const text=`${draft.subject}\n\n${draft.en}`;
+  setPendingEmail(draft,'COPY');
+  try{await navigator.clipboard.writeText(text);alert('تم نسخ البريد الإنجليزي. بعد إرساله فعليًا ارجع للتطبيق واضغط: نعم، أرسلت البريد.')}catch{prompt('انسخ النص التالي:',text)}
+};
+$('shareMailBtn').onclick=async()=>{
+  if(!draft)return;
+  const text=`${draft.subject}\n\n${draft.en}`;
+  setPendingEmail(draft,'SHARE');
+  if(navigator.share){try{await navigator.share({text})}catch{}}
+  else{prompt('انسخ النص التالي:',text)}
+};
+function openExpiryRequestForReceipt(receiptId){
+  return requests.find(x=>x.type==='expiry' && x.sourceReceiptId===receiptId && !x.closedAt) || null;
+}
+function pendingExpiryEmailForReceipt(receiptId){
+  return pendingEmails.find(x=>x.type==='expiry' && x.sourceReceiptId===receiptId) || null;
+}
+window.expiryToRequest=id=>{
+  const r=receipts.find(x=>x.id===id);if(!r)return;
+
+  const openReq=openExpiryRequestForReceipt(id);
+  if(openReq){
+    $('startupAlert').classList.add('hidden');
+    show('requests');
+    renderRequests();
+    alert('يوجد ريكوست قرب انتهاء مفتوح بالفعل لهذا الدواء. افتح الحالة الحالية للمتابعة بدل إنشاء ريكوست مكرر.');
+    return;
+  }
+
+  const pending=pendingExpiryEmailForReceipt(id);
+  if(pending){
+    $('startupAlert').classList.add('hidden');
+    show('requests');
+    renderPendingEmailConfirmation();
+    $('emailConfirmationCard').scrollIntoView({behavior:'smooth'});
+    alert('يوجد بريد مجهز لهذا التنبيه ينتظر تأكيد الإرسال أو الإلغاء.');
+    return;
+  }
+
+  requestOriginReceiptId=r.id;
+  $('requestType').value='expiry';
+  $('requestType').dispatchEvent(new Event('change'));
+  $('reqDrugName').value=r.name;
+  $('reqDrugCode').value=r.code;
+  $('reqProdDate').value=r.productionDate;
+  $('reqExpiryDate').value=r.expiryDate;
+  refreshRecipients();
+  $('startupAlert').classList.add('hidden');
+  show('requests');
+};
+
+$('exportBackupBtn').onclick=()=>{
+  const payload={
+    exportedAt:new Date().toISOString(),
+    warning:'LOCAL_BACKUP_NOT_INSTITUTIONAL_AUDIT_PROOF',
+    catalog,receipts,requests,mail,pendingEmails
+  };
+  const blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url;
+  a.download=`med-warehouse-backup-${new Date().toISOString().slice(0,10)}.json`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url),1000);
+};
+
+function renderRequests(){
+  const o=openRequests();
+  $('requestsList').innerHTML=o.length?o.map(r=>`<div class="card case">
+    <strong>${esc(r.drug)}</strong><br><span class="meta">${typeLabel(r.type)} — ${new Date(r.sentAt).toLocaleString('ar-SA')}</span>
+    <label>الإجراء المتخذ</label><textarea id="act_${r.id}"></textarea>
+    <label>تاريخ الإجراء</label><input id="actd_${r.id}" type="date">
+    <button class="primary" onclick="closeReq('${r.id}')">اعتماد وإغلاق الحالة</button>
+  </div>`).join(''):'<div class="ok">لا توجد ريكوستات مفتوحة.</div>';
+}
+window.closeReq=id=>{
+  const r=requests.find(x=>x.id===id),a=$('act_'+id).value.trim(),d=$('actd_'+id).value;
+  if(!a||!d){alert('أدخل الإجراء المتخذ وتاريخه.');return}
+  r.action=a;r.actionDate=d;r.closedAt=new Date().toISOString();
+  r.events=Array.isArray(r.events)?r.events:[];
+  r.events.push({type:'ACTION_RECORDED_AND_CASE_CLOSED',at:r.closedAt,actionDate:d,action:a});
+  save(KEYS.requests,requests);renderRequests();renderHome()
+};
+
+/* -------- Mail -------- */
+$('saveMailBtn').onclick=()=>{
+  const email=$('mailEmail').value.trim(),name=$('mailName').value.trim(),entity=$('mailEntity').value.trim(),role=$('mailRole').value,kind=$('mailKind').value;
+  if(!name||!entity||!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){alert('أكمل البريد والاسم والجهة والصفة.');return}
+  mail.push({id:uid(),email,name,entity,role,kind});save(KEYS.mail,mail);
+  $('mailEmail').value='';$('mailName').value='';$('mailEntity').value='';renderMail();refreshRecipients()
+};
+function renderMail(){
+  $('mailList').innerHTML=mail.length?mail.map(x=>`<div class="card"><strong>${esc(x.name)}</strong><br><span class="meta">${esc(x.email)}<br>${esc(x.entity)} — ${esc(x.role)} — ${x.kind==='team'?'مجموعة':'فرد'}</span><button class="danger" onclick="delMail('${x.id}')">حذف</button></div>`).join(''):'<div class="ok">قائمة البريد فارغة.</div>';
+}
+window.delMail=id=>{mail=mail.filter(x=>x.id!==id);save(KEYS.mail,mail);renderMail();refreshRecipients()};
+
+/* -------- Monitoring -------- */
+function renderMeds(){
+  const active=receipts.filter(r=>r.activatedForAlerts);
+  $('medsList').innerHTML=active.length?active.map(r=>{
+    const d=daysLeft(r.expiryDate),s=alertState(r);
+    return `<div class="card case ${s?'bad':''}"><strong>${esc(r.name)}</strong><br>
+      <span class="meta">الكود: ${esc(r.code)}<br>الإنتاج: ${r.productionDate}<br>الانتهاء: ${r.expiryDate}<br>سياسة التنبيه: ${(r.alertDays||[]).join(', ')}</span>
+      ${s?`<div class="notice">${s.kind==='expired'?`منتهي منذ ${Math.abs(s.days)} يوم`:`متبقي ${s.days} يوم — عتبة التنبيه الحالية ${s.threshold} يوم`}</div>`:''}
+    </div>`;
+  }).join(''):'<div class="ok">لا توجد سجلات مفعلة للمتابعة بعد. تبدأ المتابعة بعد اعتماد بيانات العبوة.</div>';
+}
+
+$('requestType').dispatchEvent(new Event('change'));
+refreshRecipients();renderHome();renderMail();renderRequests();renderMeds();renderPendingEmailConfirmation();
+setTimeout(showStartupAlerts,100);
+</script>
+</body>
+</html>
