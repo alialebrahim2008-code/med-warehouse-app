@@ -1,0 +1,387 @@
+--- index.html
++++ index.html
+@@ -52,7 +52,7 @@
+ <body>
+ <header>
+   <h1>أمين المستودع — الأدوية والريكوست</h1>
+-  <p>V12 — استلام العبوة → مطابقة Oracle الآمنة → تنبيه الصلاحية → ريكوست + بريد عام</p>
++  <p>V14 — استلام العبوة → مطابقة Oracle الآمنة → تنبيه الصلاحية → ريكوست + بريد عام + تقارير</p>
+ </header>
+ 
+ <main>
+@@ -62,6 +62,7 @@
+     <button id="tabOracle">مطابقة Oracle</button>
+     <button id="tabRequests">الريكوست</button>
+     <button id="tabMail">قائمة البريد</button>
++    <button id="tabReports">التقارير</button>
+     <button id="tabMeds">المتابعة</button>
+   </div>
+ 
+@@ -212,8 +213,11 @@
+       <label>المستلم</label>
+       <select id="generalRecipientSelect"></select>
+ 
+-      <label>عنوان البريد (حر)</label>
+-      <input id="generalSubject" placeholder="مثال: Reduction of M1 Max Items">
++      <label>بريد المستلم</label>
++      <input id="generalRecipientEmail" type="email" readonly placeholder="يظهر تلقائيًا من قائمة البريد">
++
++      <label>موضوع الرسالة</label>
++      <input id="generalSubject" placeholder="مثال: طلب توفير حماية شاشة للكمبيوتر">
+ 
+       <label>النص العربي الأصلي</label>
+       <textarea id="generalArBody" rows="7" placeholder="اكتب نص البريد بالعربية"></textarea>
+@@ -278,6 +282,45 @@
+     </div>
+   </section>
+ 
++
++  <section id="reportsView" class="hidden">
++    <div class="card">
++      <h2>كتابة / تحرير تقرير</h2>
++      <div class="notice">
++        نفس فكرة البريد: عربي أصلي → إنجليزي → ترجمة عكسية عربية.
++        يمكنك حفظ التقرير ثم فتحه لاحقًا وتحريره.
++      </div>
++
++      <input id="reportId" type="hidden">
++
++      <label>عنوان التقرير بالعربية</label>
++      <input id="reportTitleAr" placeholder="عنوان التقرير">
++
++      <label>عنوان التقرير بالإنجليزية</label>
++      <input id="reportTitleEn" placeholder="Report title">
++
++      <label>التقرير — عربي أصلي</label>
++      <textarea id="reportAr" rows="10" placeholder="اكتب التقرير بالعربية"></textarea>
++
++      <label>التقرير — إنجليزي</label>
++      <textarea id="reportEn" rows="10" placeholder="اكتب أو الصق الترجمة الإنجليزية"></textarea>
++
++      <label>الترجمة العكسية — عربي</label>
++      <textarea id="reportBackAr" rows="10" placeholder="اكتب أو الصق الترجمة العكسية للنص الإنجليزي"></textarea>
++
++      <label><input id="reportReviewed" type="checkbox" style="width:auto;margin-left:6px"> راجعت العربي والإنجليزي والترجمة العكسية وأعتمد الحفظ</label>
++
++      <button id="saveReportBtn" class="primary">حفظ التقرير</button>
++      <button id="newReportBtn" class="secondary">تقرير جديد</button>
++      <div id="reportMessage"></div>
++    </div>
++
++    <div class="card">
++      <h2>التقارير المحفوظة</h2>
++      <div id="reportList"></div>
++    </div>
++  </section>
++
+   <section id="medsView" class="hidden">
+     <div class="card">
+       <h2>الأدوية تحت متابعة الصلاحية</h2>
+@@ -303,7 +346,8 @@
+   mail:'mw_mail_v7',
+   pendingEmails:'mw_pending_emails_v8',
+   generalHistory:'mw_general_mail_history_v12',
+-  savedTemplates:'mw_saved_mail_templates_v12'
++  savedTemplates:'mw_saved_mail_templates_v12',
++  reports:'mw_reports_v13'
+ };
+ function load(k,f){try{return JSON.parse(localStorage.getItem(k))??f}catch{return f}}
+ function save(k,v){localStorage.setItem(k,JSON.stringify(v))}
+@@ -313,18 +357,40 @@
+ let receipts=load(KEYS.receipts,[]);
+ let requests=load(KEYS.requests,[]);
+ let mail=load(KEYS.mail,[]);
++if(!Array.isArray(mail))mail=[];
++let mailNormalized=false;
++mail=mail.map((x,i)=>{
++  const y={...x};
++  if(y.id===undefined||y.id===null||String(y.id).trim()===''){
++    y.id=`legacy_mail_${Date.now()}_${i}`;
++    mailNormalized=true;
++  }
++  if(!y.kind){
++    y.kind='individual';
++    mailNormalized=true;
++  }
++  return y;
++});
++if(mailNormalized)save(KEYS.mail,mail);
+ 
+ // One-time local migration from V6 when V7 is empty.
+ if(!catalog.length) catalog=load('mw_catalog_v6',[]);
+ if(!receipts.length) receipts=load('mw_receipts_v6',[]);
+ if(!requests.length) requests=load('mw_requests_v6',[]);
+ if(!mail.length) mail=load('mw_mail_v6',[]);
++mail=mail.map((x,i)=>({
++  ...x,
++  id:(x.id===undefined||x.id===null||String(x.id).trim()==='')?`legacy_mail_migrated_${Date.now()}_${i}`:x.id,
++  kind:x.kind||'individual'
++}));
+ save(KEYS.catalog,catalog);save(KEYS.receipts,receipts);save(KEYS.requests,requests);save(KEYS.mail,mail);
+ 
+ let draft=null;
+ let requestOriginReceiptId=null;
+ let generalHistory=load(KEYS.generalHistory,[]);
+ let savedTemplates=load(KEYS.savedTemplates,[]);
++let reports=load(KEYS.reports,[]);
++if(!Array.isArray(reports))reports=[];
+ if(!Array.isArray(generalHistory))generalHistory=[];
+ if(!Array.isArray(savedTemplates))savedTemplates=[];
+ if(!savedTemplates.length){
+@@ -349,7 +415,7 @@
+       '',
+       'Best regards,',
+       'Warehouse Keeper',
+-      'Zahra Essa'
++      'Zahrah Essa'
+     ].join('\n')
+   }];
+   save(KEYS.savedTemplates,savedTemplates);
+@@ -364,7 +430,7 @@
+ const OCR_CONFIDENCE_REVIEW_THRESHOLD=80;
+ 
+ function show(view){
+-  ['home','receive','oracle','requests','mail','meds'].forEach(x=>{
++  ['home','receive','oracle','requests','mail','reports','meds'].forEach(x=>{
+     $(x+'View').classList.toggle('hidden',x!==view);
+     const b=$('tab'+x.charAt(0).toUpperCase()+x.slice(1));
+     if(b)b.classList.toggle('active',x===view);
+@@ -372,6 +438,7 @@
+   if(view==='home')renderHome();
+   if(view==='requests')renderRequests();
+   if(view==='mail')renderMail();
++  if(view==='reports')renderReports();
+   if(view==='meds')renderMeds();
+ }
+ $('tabHome').onclick=()=>show('home');
+@@ -379,6 +446,7 @@
+ $('tabOracle').onclick=()=>show('oracle');
+ $('tabRequests').onclick=()=>show('requests');
+ $('tabMail').onclick=()=>show('mail');
++$('tabReports').onclick=()=>show('reports');
+ $('tabMeds').onclick=()=>show('meds');
+ 
+ function parseAlertDays(s){
+@@ -970,6 +1038,15 @@
+   $('sectionHeadApproved').checked=false;
+   if(t!=='expiry')requestOriginReceiptId=null;
+ };
++function findMailRecipient(id){
++  const key=String(id??'');
++  return mail.find(x=>String(x.id??'')===key)||null;
++}
++function updateGeneralRecipientEmail(){
++  const rec=findMailRecipient($('generalRecipientSelect').value);
++  $('generalRecipientEmail').value=rec?.email||'';
++}
++
+ function recipientOptions(kind){
+   const list=mail.filter(x=>x.kind===kind);
+   return list.length?list.map(x=>`<option value="${x.id}">${esc(x.name)} — ${esc(x.role)} — ${esc(x.entity)} — ${esc(x.email)}</option>`).join(''):'<option value="">لا يوجد بريد محفوظ لهذا النوع</option>';
+@@ -977,9 +1054,11 @@
+ function refreshRecipients(){
+   $('recipientSelect').innerHTML=recipientOptions($('recipientMode').value);
+   $('generalRecipientSelect').innerHTML=recipientOptions($('generalRecipientMode').value);
++  updateGeneralRecipientEmail();
+ }
+ $('recipientMode').onchange=refreshRecipients;
+ $('generalRecipientMode').onchange=refreshRecipients;
++$('generalRecipientSelect').onchange=updateGeneralRecipientEmail;
+ 
+ const MAIL_SIGNATURE_AR=[
+   'شكرًا لدعمكم.',
+@@ -991,7 +1070,7 @@
+   'Thank you for your support.',
+   'Best regards,',
+   'Warehouse Keeper',
+-  'Zahra Essa'
++  'Zahrah Essa'
+ ].join('\n');
+ 
+ const REQUEST_EMAIL_TEMPLATE_VERSION='REQUEST_EMAIL_V1';
+@@ -1023,7 +1102,7 @@
+   if(line==='شكرًا لدعمكم.')return {ok:true,line:'Thank you for your support.'};
+   if(line==='مع أطيب التحيات،')return {ok:true,line:'Best regards,'};
+   if(line==='أمين المستودع')return {ok:true,line:'Warehouse Keeper'};
+-  if(line==='زهرة عيسى')return {ok:true,line:'Zahra Essa'};
++  if(line==='زهرة عيسى')return {ok:true,line:'Zahrah Essa'};
+ 
+   const prefixes=[
+     ['اسم الدواء: ','Drug Name: '],
+@@ -1052,7 +1131,7 @@
+   if(line==='Thank you for your support.')return {ok:true,line:'شكرًا لدعمكم.'};
+   if(line==='Best regards,')return {ok:true,line:'مع أطيب التحيات،'};
+   if(line==='Warehouse Keeper')return {ok:true,line:'أمين المستودع'};
+-  if(line==='Zahra Essa')return {ok:true,line:'زهرة عيسى'};
++  if(line==='Zahrah Essa')return {ok:true,line:'زهرة عيسى'};
+ 
+   const prefixes=[
+     ['Drug Name: ','اسم الدواء: '],
+@@ -1101,14 +1180,27 @@
+ 
+ 
+ $('generateGeneralMailBtn').onclick=()=>{
+-  const rec=mail.find(x=>x.id===$('generalRecipientSelect').value);
++  const rec=findMailRecipient($('generalRecipientSelect').value);
+   const subject=$('generalSubject').value.trim();
+   const arBody=$('generalArBody').value.trim();
+   const enBody=$('generalEnBody').value.trim();
+   const backBody=$('generalBackAr').value.trim();
+ 
+-  if(!rec||!subject||!arBody||!enBody||!backBody){
+-    $('generalMailMessage').innerHTML='<div class="error">أكمل المستلم والعنوان والنص العربي والترجمة الإنجليزية والترجمة العكسية.</div>';
++  const missing=[];
++  if(!rec)missing.push('المستلم');
++  else if(!rec.email)missing.push('بريد المستلم');
++  if(!subject)missing.push('موضوع الرسالة');
++  if(!arBody)missing.push('النص العربي');
++  if(!enBody)missing.push('الترجمة الإنجليزية');
++  if(!backBody)missing.push('الترجمة العكسية العربية');
++
++  if(missing.length){
++    $('generalMailMessage').innerHTML=`<div class="error">الناقص: ${missing.join('، ')}.</div>`;
++    return;
++  }
++
++  if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(rec.email)){
++    $('generalMailMessage').innerHTML='<div class="error">بريد المستلم المحفوظ غير صالح. عدّله من قائمة البريد.</div>';
+     return;
+   }
+ 
+@@ -1153,7 +1245,7 @@
+ 
+ $('generateRequestBtn').onclick=()=>{
+   const t=$('requestType').value,drug=$('reqDrugName').value.trim(),code=$('reqDrugCode').value.trim();
+-  const prod=$('reqProdDate').value,exp=$('reqExpiryDate').value,rec=mail.find(x=>x.id===$('recipientSelect').value);
++  const prod=$('reqProdDate').value,exp=$('reqExpiryDate').value,rec=findMailRecipient($('recipientSelect').value);
+   if(!drug||!code||!rec){$('requestMessage').innerHTML='<div class="error">أكمل بيانات الدواء واختر المستلم.</div>';return}
+   if(t!=='urgent'&&(!prod||!exp)){$('requestMessage').innerHTML='<div class="error">أدخل تاريخ الإنتاج والانتهاء.</div>';return}
+   if(t!=='urgent'&&!isDateOrderValid(prod,exp)){
+@@ -1378,7 +1470,7 @@
+   const payload={
+     exportedAt:new Date().toISOString(),
+     warning:'LOCAL_BACKUP_NOT_INSTITUTIONAL_AUDIT_PROOF',
+-    catalog,receipts,requests,mail,pendingEmails,generalHistory,savedTemplates
++    catalog,receipts,requests,mail,pendingEmails,generalHistory,savedTemplates,reports
+   };
+   const blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'});
+   const url=URL.createObjectURL(blob);
+@@ -1409,6 +1501,100 @@
+   save(KEYS.requests,requests);renderRequests();renderHome()
+ };
+ 
++
++/* -------- Reports -------- */
++function clearReportForm(){
++  $('reportId').value='';
++  $('reportTitleAr').value='';
++  $('reportTitleEn').value='';
++  $('reportAr').value='';
++  $('reportEn').value='';
++  $('reportBackAr').value='';
++  $('reportReviewed').checked=false;
++  $('reportMessage').innerHTML='';
++}
++function renderReports(){
++  if(!reports.length){
++    $('reportList').innerHTML='<div class="ok">لا توجد تقارير محفوظة.</div>';
++    return;
++  }
++  $('reportList').innerHTML=reports.map(r=>`
++    <div class="card case">
++      <strong>${esc(r.titleAr||'تقرير')}</strong><br>
++      <span class="meta">${esc(r.titleEn||'')}<br>آخر تحديث: ${new Date(r.updatedAt||r.createdAt).toLocaleString('ar-SA')}</span>
++      <pre class="email ar">${esc(r.ar||'')}</pre>
++      <details><summary>النسخة الإنجليزية</summary><pre class="email">${esc(r.en||'')}</pre></details>
++      <details><summary>الترجمة العكسية العربية</summary><pre class="email ar">${esc(r.backAr||'')}</pre></details>
++      <button class="secondary" onclick="editReport('${r.id}')">تحرير التقرير</button>
++      <button class="secondary" onclick="copyReport('${r.id}','ar')">نسخ العربي</button>
++      <button class="secondary" onclick="copyReport('${r.id}','en')">نسخ الإنجليزي</button>
++    </div>
++  `).join('');
++}
++$('saveReportBtn').onclick=()=>{
++  const id=$('reportId').value||uid();
++  const titleAr=$('reportTitleAr').value.trim();
++  const titleEn=$('reportTitleEn').value.trim();
++  const ar=$('reportAr').value.trim();
++  const en=$('reportEn').value.trim();
++  const backAr=$('reportBackAr').value.trim();
++
++  if(!titleAr||!titleEn||!ar||!en||!backAr){
++    $('reportMessage').innerHTML='<div class="error">أكمل العنوانين والنص العربي والإنجليزي والترجمة العكسية.</div>';
++    return;
++  }
++  if(!$('reportReviewed').checked){
++    $('reportMessage').innerHTML='<div class="error">راجع النسخ الثلاث ثم فعّل الاعتماد قبل الحفظ.</div>';
++    return;
++  }
++
++  const now=new Date().toISOString();
++  const existing=reports.find(x=>x.id===id);
++  const rec={
++    id,titleAr,titleEn,ar,en,backAr,
++    translationFlow:'ARABIC_ORIGINAL_TO_ENGLISH_TO_ARABIC_BACK_TRANSLATION',
++    reviewed:true,
++    createdAt:existing?.createdAt||now,
++    updatedAt:now
++  };
++
++  if(existing)Object.assign(existing,rec);
++  else reports.unshift(rec);
++
++  save(KEYS.reports,reports);
++  $('reportId').value=id;
++  $('reportReviewed').checked=false;
++  $('reportMessage').innerHTML='<div class="ok">تم حفظ التقرير.</div>';
++  renderReports();
++};
++$('newReportBtn').onclick=clearReportForm;
++
++window.editReport=id=>{
++  const r=reports.find(x=>x.id===id);if(!r)return;
++  $('reportId').value=r.id;
++  $('reportTitleAr').value=r.titleAr||'';
++  $('reportTitleEn').value=r.titleEn||'';
++  $('reportAr').value=r.ar||'';
++  $('reportEn').value=r.en||'';
++  $('reportBackAr').value=r.backAr||'';
++  $('reportReviewed').checked=false;
++  show('reports');
++  window.scrollTo({top:0,behavior:'smooth'});
++};
++
++window.copyReport=async(id,lang)=>{
++  const r=reports.find(x=>x.id===id);if(!r)return;
++  const text=lang==='en'
++    ? `${r.titleEn}\n\n${r.en}`
++    : `${r.titleAr}\n\n${r.ar}`;
++  try{
++    await navigator.clipboard.writeText(text);
++    alert(lang==='en'?'تم نسخ التقرير الإنجليزي.':'تم نسخ التقرير العربي.');
++  }catch{
++    prompt('انسخ التقرير:',text);
++  }
++};
++
+ /* -------- Mail -------- */
+ $('saveMailBtn').onclick=()=>{
+   const email=$('mailEmail').value.trim(),name=$('mailName').value.trim(),entity=$('mailEntity').value.trim(),role=$('mailRole').value,kind=$('mailKind').value;
+@@ -1435,7 +1621,7 @@
+     </div>
+   `).join(''):'<div class="meta">لا يوجد بريد عام مؤكد الإرسال حتى الآن.</div>';
+ }
+-window.delMail=id=>{mail=mail.filter(x=>x.id!==id);save(KEYS.mail,mail);renderMail();refreshRecipients()};
++window.delMail=id=>{mail=mail.filter(x=>String(x.id)!==String(id));save(KEYS.mail,mail);renderMail();refreshRecipients()};
+ 
+ /* -------- Monitoring -------- */
+ function renderMeds(){
+@@ -1450,7 +1636,7 @@
+ }
+ 
+ $('requestType').dispatchEvent(new Event('change'));
+-refreshRecipients();renderHome();renderMail();renderRequests();renderMeds();renderPendingEmailConfirmation();
++refreshRecipients();renderHome();renderMail();renderRequests();renderReports();renderMeds();renderPendingEmailConfirmation();
+ setTimeout(showStartupAlerts,100);
+ </script>
+ </body>
