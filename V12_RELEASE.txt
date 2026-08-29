@@ -1,0 +1,1 @@
+V12 release marker. General email composer, standard warehouse-keeper closing, and photo-derived reference email added.
