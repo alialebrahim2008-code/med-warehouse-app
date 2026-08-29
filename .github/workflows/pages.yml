@@ -24,15 +24,25 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
 
-      - name: Build V16 static site
+      - name: Build and verify V16 static site
         run: |
           set -euo pipefail
           mkdir -p dist
-          base64 -d site-v16.html.gz.b64 | gunzip > dist/index.html
+          cat \
+            site-v16.part01 \
+            site-v16.part02 \
+            site-v16.part03 \
+            site-v16.part04_00 site-v16.part04_01 site-v16.part04_02 \
+            site-v16.part05_00 site-v16.part05_01 site-v16.part05_02 \
+            site-v16.part06_00 site-v16.part06_01 site-v16.part06_02 \
+            | base64 -d | gunzip > dist/index.html
+          test "$(wc -c < dist/index.html)" -eq 97428
+          test "$(sha256sum dist/index.html | awk '{print $1}')" = "60b719a639f40f48c9b4e1731c1dc7216d57547f169021ed8813e3113db479ce"
           grep -q 'V16' dist/index.html
           grep -q 'startLiveBarcodeBtn' dist/index.html
           grep -q 'parseGs1ElementString' dist/index.html
           grep -q 'normalizeImageForOcr' dist/index.html
+          grep -q "Tesseract.recognize(normalized,'eng+ara'" dist/index.html
 
       - name: Configure Pages
         uses: actions/configure-pages@v5
