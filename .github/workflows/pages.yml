@@ -24,13 +24,23 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
 
+      - name: Build V16 static site
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          base64 -d site-v16.html.gz.b64 | gunzip > dist/index.html
+          grep -q 'V16' dist/index.html
+          grep -q 'startLiveBarcodeBtn' dist/index.html
+          grep -q 'parseGs1ElementString' dist/index.html
+          grep -q 'normalizeImageForOcr' dist/index.html
+
       - name: Configure Pages
         uses: actions/configure-pages@v5
 
       - name: Upload static site
         uses: actions/upload-pages-artifact@v4
         with:
-          path: .
+          path: dist
 
       - name: Deploy to GitHub Pages
         id: deployment
