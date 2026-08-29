@@ -24,13 +24,19 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
 
+      - name: Build V14 site
+        run: |
+          mkdir -p dist
+          cp index.html dist/index.html
+          patch dist/index.html < .github/v14.patch
+
       - name: Configure Pages
         uses: actions/configure-pages@v5
 
       - name: Upload static site
         uses: actions/upload-pages-artifact@v4
         with:
-          path: .
+          path: dist
 
       - name: Deploy to GitHub Pages
         id: deployment
